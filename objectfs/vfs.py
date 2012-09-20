@@ -33,6 +33,11 @@ class Storage(object):
     def create(self, name, mode=0, parent=None):
         """
         Create an inode
+
+        'mode' parameter is directly provided to the inode instance, the
+        storage instance has nothing to do nor with file modes, neither with
+        file types. The inode instance should accept two parameters, 'file
+        name' and 'file mode'. Here we do not care what it will do with them.
         """
         if parent:
             self.cwd = parent
