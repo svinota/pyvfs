@@ -1,0 +1,12 @@
+#!/usr/bin/env python
+
+from objectfs.vfs import Storage
+from objectfs.v9fs import v9fs, Inode
+import py9p
+
+if __name__ == "__main__" :
+    storage = Storage(Inode)
+    srv = py9p.Server(listen=('127.0.0.1', 8000), chatty=True, dotu=True)
+    srv.mount(v9fs(storage))
+    srv.serve()
+
