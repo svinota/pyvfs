@@ -1,8 +1,137 @@
 """
 Internal VFS protocol
 """
+
 import os
 import stat
+import time
+import pwd
+import grp
+from StringIO import StringIO
+
+DEFAULT_DIR_MODE = 0755
+DEFAULT_FILE_MODE = 0644
+
+class Inode(StringIO):
+    """
+    VFS inode
+    """
+    # static member for special names
+    special_names = [
+            ".",
+            "..",
+            ]
+
+    def __init__(self, name, parent=None, mode=0, storage=None):
+
+        StringIO.__init__(self)
+
+        self.parent = parent or self
+        self.storage = storage or parent.storage
+        self._set_name(name)
+        self.type = 0
+        self.dev = 0
+        self.atime = self.mtime = int(time.time())
+        self.uidnum = self.muidnum = os.getuid()
+        self.gidnum = os.getgid()
+        self.uid = self.muid = pwd.getpwuid(self.uidnum).pw_name
+        self.gid = grp.getgrgid(self.gidnum).gr_name
+        self.children = {}
+        self.writelock = False
+        if mode & stat.S_IFDIR:
+            self.mode = stat.S_IFDIR | DEFAULT_DIR_MODE
+            self.children["."] = self
+            self.children[".."] = self.parent
+        else:
+            self.mode = DEFAULT_FILE_MODE
+
+    def __hash__(self):
+        return self.path
+
+    def _get_name(self):
+        return self.__name
+
+    def _set_name(self, name):
+        self._check_special(name)
+        try:
+            self.storage.unregister(self)
+        except:
+            pass
+        self.__name = name
+        self.path = int(abs(hash(self.absolute_path())))
+        self.storage.register(self)
+
+    name = property(_get_name, _set_name)
+
+    def _check_special(self, *args):
+        for i in args:
+            if i in self.special_names:
+                raise py9p.ServerError(py9p.Eperm)
+
+    def absolute_path(self):
+        if (self.parent is not None) and (self.parent != self):
+            return "%s/%s" % (self.parent.absolute_path(), self.name)
+        else:
+            return self.name
+
+    def commit(self):
+        pass
+
+    def sync(self):
+        pass
+
+    def remove(self, child):
+        """
+        Remove a child from a directory
+        """
+        self._check_special(child.name)
+        del self.children[child.name]
+
+    def create(self, name, mode=0):
+        """
+        Create a child in a directory
+        """
+        self._check_special(name)
+        # return default Inode class
+        self.children[name] = Inode(name, self, mode=mode,
+            storage=self.storage)
+        return self.children[name]
+
+    def rename(self, old_name, new_name):
+        """
+        Rename a child
+        """
+        self._check_special(old_name, new_name)
+        self.children[new_name] = self.children[old_name]
+        self.children[new_name].name = new_name
+        del self.children[old_name]
+
+    def wstat(self, stat):
+        # change uid?
+        if stat.uidnum != 0xFFFFFFFF:
+            self.uid = pwd.getpwuid(stat.uidnum).pw_name
+        else:
+            if stat.uid:
+                self.uid = stat.uid
+        # change gid?
+        if stat.gidnum != 0xFFFFFFFF:
+            self.gid = grp.getgrgid(stat.gidnum).gr_name
+        else:
+            if stat.gid:
+                self.gid = stat.gid
+        # change mode?
+        if stat.mode != 0xFFFFFFFF:
+            self.mode = ((self.mode & 07777) ^ self.mode) | (stat.mode & 07777)
+        # change name?
+        if stat.name:
+            self.parent.rename(self.name, stat.name)
+
+    @property
+    def length(self):
+        if self.mode & stat.S_IFDIR:
+            return len(self.children.keys())
+        else:
+            return self.len
 
 class Storage(object):
     """
@@ -12,25 +141,24 @@ class Storage(object):
     Should be provided with root 'inode' class on init. The 'inode'
     class MUST support the interface... that should be defined :)
     """
-    def __init__(self, inode):
+    def __init__(self):
         self.files = {}
-        self.root = inode(name="/", ftype=stat.S_IFDIR, storage=self)
-        self.cwd = self.root
-        self.files[hash(self.root)] = self.root
+        self.root = Inode(name="/", mode=stat.S_IFDIR, storage=self)
+        self.files[self.root.path] = self.root
 
     def register(self, inode):
         """
         Register a new inode in the dictionary
         """
-        self.files[hash(inode)] = inode
+        self.files[inode.path] = inode
 
     def unregister(self, inode):
         """
         Remove an inode from the dictionary
         """
-        del self.files[hash(inode)]
+        del self.files[inode.path]
 
-    def create(self, name, mode=0, parent=None):
+    def create(self, name, parent, mode=0):
         """
         Create an inode
 
@@ -39,14 +167,9 @@ class Storage(object):
         file types. The inode instance should accept two parameters, 'file
         name' and 'file mode'. Here we do not care what it will do with them.
         """
-        if parent:
-            self.cwd = parent
-        new = self.cwd.create(name, mode)
-        self.files[hash(new)] = new
+        new = parent.create(name, mode)
+        self.files[new.path] = new
         return new
-
-    def chdir(self, target):
-        self.cwd = self.files[target]
 
     def checkout(self, target):
         return self.files[target]
