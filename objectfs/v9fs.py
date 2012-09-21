@@ -56,11 +56,10 @@ class v9fs(py9p.Server):
 
     def open(self, srv, req):
         f = self.storage.checkout(req.fid.qid.path)
+        if req.ifcall.mode & py9p.OTRUNC:
+            f.seek(0)
+            f.truncate()
         f.sync()
-
-        if (req.ifcall.mode & mode2plan(f.mode)) != py9p.OREAD :
-            raise py9p.ServerError(py9p.Eperm)
-
         srv.respond(req, None)
 
     def walk(self, srv, req, fid = None):
