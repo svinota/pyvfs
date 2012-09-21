@@ -12,7 +12,7 @@ from StringIO import StringIO
 DEFAULT_DIR_MODE = 0755
 DEFAULT_FILE_MODE = 0644
 
-class Inode(StringIO):
+class Inode(object, StringIO):
     """
     VFS inode
     """
@@ -28,7 +28,7 @@ class Inode(StringIO):
 
         self.parent = parent or self
         self.storage = storage or parent.storage
-        self._set_name(name)
+        self.name = name
         self.type = 0
         self.dev = 0
         self.atime = self.mtime = int(time.time())
@@ -161,11 +161,6 @@ class Storage(object):
     def create(self, name, parent, mode=0):
         """
         Create an inode
-
-        'mode' parameter is directly provided to the inode instance, the
-        storage instance has nothing to do nor with file modes, neither with
-        file types. The inode instance should accept two parameters, 'file
-        name' and 'file mode'. Here we do not care what it will do with them.
         """
         new = parent.create(name, mode)
         self.files[new.path] = new
