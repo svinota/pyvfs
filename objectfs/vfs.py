@@ -93,7 +93,7 @@ class Inode(object, StringIO):
         """
         self._check_special(name)
         # return default Inode class
-        self.children[name] = Inode(name, self, mode=mode,
+        self.children[name] = type(self)(name, self, mode=mode,
             storage=self.storage)
         return self.children[name]
 
@@ -141,10 +141,9 @@ class Storage(object):
     Should be provided with root 'inode' class on init. The 'inode'
     class MUST support the interface... that should be defined :)
     """
-    def __init__(self):
+    def __init__(self, inode=Inode):
         self.files = {}
-        self.root = Inode(name="/", mode=stat.S_IFDIR, storage=self)
-        self.files[self.root.path] = self.root
+        self.root = inode(name="/", mode=stat.S_IFDIR, storage=self)
 
     def register(self, inode):
         """
