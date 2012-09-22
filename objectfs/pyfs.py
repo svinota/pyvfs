@@ -27,9 +27,15 @@ File.register(types.UnicodeType)
 
 class PyFS(Storage):
 
-    def create(self, obj, parent=None, name=None):
+    def create(self, obj, parent=None, name=None, stack=None):
         if not parent:
             parent = self.root
+
+        if not stack:
+            stack = {}
+
+        if obj in stack.keys():
+            return
 
         if isinstance(obj, File):
             if not name:
@@ -37,11 +43,15 @@ class PyFS(Storage):
             new = parent.create(name)
             new.write(str(obj))
         else:
-            new = parent.create(repr(obj), mode=stat.S_IFDIR)
-            for item in dir(obj):
-                if item.startswith('_') or isinstance(getattr(obj, item), Skip):
-                    continue
-                self.create(getattr(obj, item), new, item)
+            try:
+                stack[obj] = True
+                new = parent.create(repr(obj).strip("<>"), mode=stat.S_IFDIR)
+                for item in dir(obj):
+                    if item.startswith('_') or isinstance(getattr(obj, item), Skip):
+                        continue
+                    self.create(getattr(obj, item), new, item, stack)
+            except:
+                return
 
         return new
 
