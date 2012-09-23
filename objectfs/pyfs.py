@@ -31,10 +31,11 @@ class vInode(Inode):
 
     def __init__(self, *argv, **kwarg):
         Inode.__init__(self, *argv, **kwarg)
-        if hasattr(self.parent, "stack"):
-            self.stack = self.parent.stack
-        else:
-            self.stack = {}
+        if self != self.parent:
+            if hasattr(self.parent, "stack"):
+                self.stack = self.parent.stack
+            else:
+                self.stack = {}
         self.observe = None
 
     def _get_observe(self):
