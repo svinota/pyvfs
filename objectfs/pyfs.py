@@ -10,6 +10,8 @@ from objectfs.vfs import Storage, Inode
 from objectfs.v9fs import v9fs
 from threading import Thread
 
+class Eexist(Exception): pass
+
 class Skip:
     __metaclass__ = ABCMeta
 Skip.register(types.MethodType)
@@ -27,11 +29,36 @@ File.register(types.UnicodeType)
 
 class vInode(Inode):
 
+    def __init__(self, *argv, **kwarg):
+        Inode.__init__(self, *argv, **kwarg)
+        if hasattr(self.parent, "stack"):
+            self.stack = self.parent.stack
+        else:
+            self.stack = {}
+        self.observe = None
+
+    def _get_observe(self):
+        return self.__observe
+
+    def _set_observe(self, obj):
+        if (self.mode & stat.S_IFDIR) and (obj is not None):
+            if self.stack.has_key(hash(obj)):
+                self.storage.remove(self.path)
+                raise Eexist()
+            try:
+                del self.stack[hash(self.observe)]
+            except:
+                pass
+            self.stack[hash(obj)] = True
+        self.__observe = obj
+
+    observe = property(_get_observe, _set_observe)
+
     def register(self, obj):
         self.observe = obj
 
     def sync(self):
-        if not hasattr(self, "observe"):
+        if not self.observe:
             return
 
         if self.mode & stat.S_IFDIR:
@@ -48,7 +75,10 @@ class vInode(Inode):
             # sync observe objects of children
             for i in dir(self.observe):
                 if self.children.has_key(i):
-                    self.children[i].observe = getattr(self.observe, i)
+                    try:
+                        self.children[i].observe = getattr(self.observe, i)
+                    except:
+                        pass
         else:
             self.seek(0)
             self.truncate()
@@ -56,18 +86,12 @@ class vInode(Inode):
 
 class PyFS(Storage):
 
-    def create(self, obj, parent=None, name=None, stack=None):
+    def create(self, obj, parent=None, name=None):
         if not parent:
             parent = self.root
 
-        if not stack:
-            stack = {}
-
         if not name:
             name = repr(obj)
-
-        if obj in stack.keys():
-            return
 
         if isinstance(obj, Skip):
             return
@@ -80,11 +104,10 @@ class PyFS(Storage):
             new.register(obj)
         else:
             try:
-                stack[obj] = True
                 new = parent.create(name, mode=stat.S_IFDIR)
                 new.register(obj)
                 for item in dir(obj):
-                    self.create(getattr(obj, item), new, item, stack)
+                    self.create(getattr(obj, item), new, item)
             except:
                 return
 
@@ -94,7 +117,7 @@ class PyFS(Storage):
 # rpdb2.start_embedded_debugger("bala", fAllowRemote=True)
 
 pyfs = PyFS(vInode)
-srv = py9p.Server(listen=('127.0.0.1', 8000), chatty=True, dotu=True)
+srv = py9p.Server(listen=('0.0.0.0', 10001), chatty=False, dotu=True)
 srv.mount(v9fs(pyfs))
 srv_thread = Thread(target=srv.serve)
 srv_thread.setDaemon(True)
