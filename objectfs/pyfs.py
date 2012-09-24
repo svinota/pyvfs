@@ -18,6 +18,10 @@ Skip.register(types.BuiltinFunctionType)
 Skip.register(types.BuiltinMethodType)
 Skip.register(types.MethodType)
 Skip.register(types.ClassType)
+Skip.register(types.FunctionType)
+Skip.register(types.GeneratorType)
+Skip.register(types.ModuleType)
+Skip.register(types.UnboundMethodType)
 
 class List:
     __metaclass__ = ABCMeta
