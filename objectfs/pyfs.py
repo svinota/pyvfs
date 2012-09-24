@@ -14,8 +14,17 @@ class Eexist(Exception): pass
 
 class Skip:
     __metaclass__ = ABCMeta
+Skip.register(types.BuiltinFunctionType)
+Skip.register(types.BuiltinMethodType)
 Skip.register(types.MethodType)
 Skip.register(types.ClassType)
+
+class List:
+    __metaclass__ = ABCMeta
+List.register(list)
+List.register(set)
+List.register(tuple)
+List.register(frozenset)
 
 class File:
     __metaclass__ = ABCMeta
@@ -26,6 +35,20 @@ File.register(types.IntType)
 File.register(types.LongType)
 File.register(types.StringType)
 File.register(types.UnicodeType)
+
+def x_get(obj, item):
+    if isinstance(obj, List):
+        return obj[int(item)]
+    if isinstance(obj, types.DictType):
+        return obj[item]
+    return getattr(obj, item)
+
+def x_dir(obj):
+    if isinstance(obj, List):
+        return [ str(x) for x in xrange(len(obj)) ]
+    if isinstance(obj, types.DictType):
+        return [ x for x in obj.keys() if isinstance(x, types.StringType) ]
+    return [ x for x in dir(obj) if not x.startswith("_") ]
 
 class vInode(Inode):
 
@@ -42,15 +65,21 @@ class vInode(Inode):
         return self.__observe
 
     def _set_observe(self, obj):
+        try:
+            if id(obj) == id(self.__observe):
+                return
+        except:
+            pass
+
         if (self.mode & stat.S_IFDIR) and (obj is not None):
-            if self.stack.has_key(hash(obj)):
+            if self.stack.has_key(id(obj)):
                 self.storage.remove(self.path)
                 raise Eexist()
             try:
-                del self.stack[hash(self.observe)]
+                del self.stack[id(self.__observe)]
             except:
                 pass
-            self.stack[hash(obj)] = True
+            self.stack[id(obj)] = True
         self.__observe = obj
 
     observe = property(_get_observe, _set_observe)
@@ -64,26 +93,26 @@ class vInode(Inode):
 
         if self.mode & stat.S_IFDIR:
             chs = set(self.children.keys())
-            obs = set(dir(self.observe))
+            obs = set(x_dir(self.observe))
             to_delete = chs - obs - set(self.special_names)
             to_create = obs - chs
             for i in to_delete:
                 self.storage.remove(self.children[i].path)
             # consider for saving stack in the root object inode!
             for i in to_create:
-                self.storage.create(getattr(self.observe, i),
+                self.storage.create(x_get(self.observe, i),
                         parent=self, name=i)
             # sync observe objects of children
-            for i in dir(self.observe):
+            for i in x_dir(self.observe):
                 if self.children.has_key(i):
                     try:
-                        self.children[i].observe = getattr(self.observe, i)
+                        self.children[i].observe = x_get(self.observe, i)
                     except:
                         pass
         else:
             self.seek(0)
             self.truncate()
-            self.write(str(getattr(self.parent.observe, self.name)))
+            self.write(str(x_get(self.parent.observe, self.name)))
 
 class PyFS(Storage):
 
@@ -107,8 +136,8 @@ class PyFS(Storage):
             try:
                 new = parent.create(name, mode=stat.S_IFDIR)
                 new.register(obj)
-                for item in dir(obj):
-                    self.create(getattr(obj, item), new, item)
+                for item in x_dir(obj):
+                    self.create(x_get(obj, item), new, item)
             except:
                 return
 
