@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from objectfs.pyfs import export
+import gc
 
 @export
 class Bala(object):
@@ -27,6 +28,11 @@ while True:
     a = raw_input("$ ")
     if a == "pop":
         e.pop()
+    elif a == "gc":
+        gc.collect()
+    elif a == "ls":
+        print e
+        print [ x for x in gc.get_objects() if isinstance(x,Bala) ]
     else:
         e.append(Bala(a))
 

@@ -5,6 +5,7 @@ Internal VFS protocol
 import types
 import stat
 import py9p
+import weakref
 from abc import ABCMeta
 from objectfs.vfs import Storage, Inode
 from objectfs.v9fs import v9fs
@@ -39,6 +40,7 @@ File.register(types.IntType)
 File.register(types.LongType)
 File.register(types.StringType)
 File.register(types.UnicodeType)
+File.register(types.NoneType)
 
 def x_get(obj, item):
     if isinstance(obj, List):
@@ -58,41 +60,81 @@ class vInode(Inode):
 
     def __init__(self, *argv, **kwarg):
         Inode.__init__(self, *argv, **kwarg)
-        if self != self.parent:
-            if hasattr(self.parent, "stack"):
-                self.stack = self.parent.stack
-            else:
-                self.stack = {}
-        self.observe = None
+        if hasattr(self.parent, "stack"):
+            self.stack = self.parent.stack
+        else:
+            self.stack = {}
+        self.root = False
+        # force self.observe, bypass property setter
+        self.__observe = None
+
+    def _get_root_flag(self):
+        return self.__root
+
+    def _set_root_flag(self, value):
+        if value:
+            # terminate stacks on root vInodes
+            self.stack = {}
+        self.__root = value
+
+    root = property(_get_root_flag, _set_root_flag)
 
     def _get_observe(self):
-        return self.__observe
+        if self.root:
+            return self.__observe
+        else:
+            return x_get(self.parent.observe, self.name)
 
     def _set_observe(self, obj):
+
+        if isinstance(obj, File):
+            return
+
         try:
-            if id(obj) == id(self.__observe):
+            wp = weakref.proxy(obj) #, lambda x: self.storage.remove(self.path))
+        except:
+            wp = obj
+
+        if self.stack.has_key(id(wp)):
+            self.storage.remove(self.path)
+            raise Eexist()
+        try:
+            del self.stack[id(self.__observe)]
+        except:
+            pass
+        self.stack[id(wp)] = True
+ 
+        if not self.root:
+            return
+
+        try:
+            if id(wp) == id(self.__observe):
                 return
         except:
             pass
 
-        if (self.mode & stat.S_IFDIR) and (obj is not None):
-            if self.stack.has_key(id(obj)):
-                self.storage.remove(self.path)
-                raise Eexist()
-            try:
-                del self.stack[id(self.__observe)]
-            except:
-                pass
-            self.stack[id(obj)] = True
-        self.__observe = obj
+        self.__observe = wp
 
     observe = property(_get_observe, _set_observe)
 
     def register(self, obj):
         self.observe = obj
 
+    def create(self, name, mode=0, obj=None, root=False):
+
+        new = Inode.create(self, name, mode)
+        new.root = root
+        new.observe = obj
+
+        return new
+
     def sync(self):
-        if not self.observe:
+        if self.observe is None:
+            for (i,k) in self.children.items():
+                try:
+                    x_dir(k.observe)
+                except:
+                    self.storage.remove(k.path)
             return
 
         if self.mode & stat.S_IFDIR:
@@ -106,13 +148,6 @@ class vInode(Inode):
             for i in to_create:
                 self.storage.create(x_get(self.observe, i),
                         parent=self, name=i)
-            # sync observe objects of children
-            for i in x_dir(self.observe):
-                if self.children.has_key(i):
-                    try:
-                        self.children[i].observe = x_get(self.observe, i)
-                    except:
-                        pass
         else:
             self.seek(0)
             self.truncate()
@@ -120,7 +155,7 @@ class vInode(Inode):
 
 class PyFS(Storage):
 
-    def create(self, obj, parent=None, name=None):
+    def create(self, obj, parent=None, name=None, root=False):
         if not parent:
             parent = self.root
 
@@ -135,11 +170,10 @@ class PyFS(Storage):
 
         if isinstance(obj, File):
             new = parent.create(name)
-            new.register(obj)
         else:
             try:
-                new = parent.create(name, mode=stat.S_IFDIR)
-                new.register(obj)
+                new = parent.create(name, mode=stat.S_IFDIR, obj=obj,
+                        root=root)
                 for item in x_dir(obj):
                     self.create(x_get(obj, item), new, item)
             except:
@@ -151,7 +185,8 @@ class PyFS(Storage):
 # rpdb2.start_embedded_debugger("bala", fAllowRemote=True)
 
 pyfs = PyFS(vInode)
-srv = py9p.Server(listen=('0.0.0.0', 10001), chatty=False, dotu=True)
+pyfs.root.root = True
+srv = py9p.Server(listen=('0.0.0.0', 10001), chatty=True, dotu=True)
 srv.mount(v9fs(pyfs))
 srv_thread = Thread(target=srv.serve)
 srv_thread.setDaemon(True)
@@ -162,7 +197,7 @@ def export(c):
     def new_init(self, *argv, **kwarg):
         global pyfs
         old_init(self, *argv, **kwarg)
-        pyfs.create(self)
+        pyfs.create(self, root=True)
     c.__init__ = new_init
     return c
 
