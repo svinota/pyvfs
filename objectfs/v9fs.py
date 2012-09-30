@@ -31,7 +31,7 @@ def inode2dir(inode):
             gid=inode.gid,
             muid=inode.muid)
 
-# 8<---------------------------------------------------------------------------
+# 8<-----------------------------------------------------------------------
 #
 # 9p2000 specific layer, that represents internal storage protocol in the
 # terms of 9p2000 file system. One MUST extract Inode class to the layer

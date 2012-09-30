@@ -1,9 +1,28 @@
 """
-Internal VFS protocol
+The module should be used to create filesystem that
+represents Python objects as directories and files.
+This allows easy inspection of the objects in runtime
+with any file management tool, e.g. bash.
+
+By now the module uses 9p2000 filesystem and creates
+it just after the import call. You can mount it with
+`mount -t 9p -o port=10001 127.0.0.1 /mnt/debugfs` on
+your Linux system, or you can use FUSE, or any 9p
+client.
+
+By default it listens on tcp 127.0.0.1:10001, but you
+can change the behaviour with environment variables:
+
+PYFS_PORT -- tcp port; UNIX sockets are not supported
+    by now, but they are planned
+PYFS_ADDRESS -- IPv4 address, use 0.0.0.0 to allow
+    remote access
+PYFS_DEBUG -- turn on stderr debug output of py9p
 """
 
 import types
 import stat
+import os
 import py9p
 import weakref
 from abc import ABCMeta
@@ -48,7 +67,7 @@ File.register(types.UnicodeType)
 File.register(types.NoneType)
 
 
-def x_get(obj, item):
+def _getattr(obj, item):
     if isinstance(obj, List):
         return obj[int(item)]
     if isinstance(obj, types.DictType):
@@ -56,7 +75,7 @@ def x_get(obj, item):
     return getattr(obj, item)
 
 
-def x_dir(obj):
+def _dir(obj):
     if isinstance(obj, List):
         return [str(x) for x in xrange(len(obj))]
     if isinstance(obj, types.DictType):
@@ -117,7 +136,7 @@ class vInode(Inode):
         if self.root:
             return self.__observe
         else:
-            return x_get(self.parent.observe, self.name)
+            return _getattr(self.parent.observe, self.name)
 
     def _set_observe(self, obj):
 
@@ -171,7 +190,7 @@ class vInode(Inode):
             for (i, k) in self.children.items():
                 try:
                     if hasattr(k, "observe"):
-                        x_dir(k.observe)
+                        _dir(k.observe)
                         if k.observe is not None:
                             if _get_name(k.observe) != i:
                                 self.rename(i, _get_name(k.observe))
@@ -181,19 +200,19 @@ class vInode(Inode):
 
         if self.mode & stat.S_IFDIR:
             chs = set(self.children.keys())
-            obs = set(x_dir(self.observe))
+            obs = set(_dir(self.observe))
             to_delete = chs - obs - set(self.special_names)
             to_create = obs - chs
             for i in to_delete:
                 self.storage.remove(self.children[i].path)
             # consider for saving stack in the root object inode!
             for i in to_create:
-                self.storage.create(x_get(self.observe, i),
+                self.storage.create(_getattr(self.observe, i),
                         parent=self, name=i)
         else:
             self.seek(0)
             self.truncate()
-            self.write(str(x_get(self.parent.observe, self.name)))
+            self.write(str(_getattr(self.parent.observe, self.name)))
 
 
 class PyFS(Storage):
@@ -224,19 +243,28 @@ class PyFS(Storage):
             try:
                 new = parent.create(name, mode=stat.S_IFDIR, obj=obj,
                         root=root)
-                for item in x_dir(obj):
-                    self.create(x_get(obj, item), new, item)
+                for item in _dir(obj):
+                    self.create(_getattr(obj, item), new, item)
             except:
                 return
 
         return new
 
-# import rpdb2
-# rpdb2.start_embedded_debugger("bala", fAllowRemote=True)
+# 8<-----------------------------------------------------------------------
+#
+# configure file server
+_PyFS_ADDRESS = os.environ.get("PYFS_ADDRESS", "127.0.0.1")
+_PyFS_PORT = int(os.environ.get("PYFS_PORT", "10001"))
+_PyFS_DEBUG = os.environ.get("PYFS_DEBUG", "False").lower() in (
+    "yes", "true", "t", "1")
 
+# create FS
 pyfs = PyFS(vInode)
 pyfs.root.root = True
-srv = py9p.Server(listen=('0.0.0.0', 10001), chatty=True, dotu=True)
+
+# start the server
+srv = py9p.Server(listen=(_PyFS_ADDRESS, _PyFS_PORT),
+    chatty=_PyFS_DEBUG, dotu=True)
 srv.mount(v9fs(pyfs))
 srv_thread = Thread(target=srv.serve)
 srv_thread.setDaemon(True)
@@ -252,3 +280,6 @@ def export(c):
         pyfs.create(self, root=True)
     c.__init__ = new_init
     return c
+
+# make the module safe for import
+__all__ = [export]
