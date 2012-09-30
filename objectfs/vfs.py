@@ -80,11 +80,13 @@ class Inode(object, StringIO):
             if i in self.special_names:
                 raise Eperm()
 
-    def absolute_path(self):
-        if (self.parent is not None) and (self.parent != self):
-            return "%s/%s" % (self.parent.absolute_path(), self.name)
+    def absolute_path(self, stop=None):
+        if (self.parent is not None) and\
+                (self.parent != self) and\
+                (self != stop):
+            return "%s/%s" % (self.parent.absolute_path(stop), self.name)
         else:
-            return self.name
+            return ""
 
     def commit(self):
         pass

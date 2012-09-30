@@ -39,6 +39,10 @@ class Eexist(Exception):
     pass
 
 
+class Eperm(Exception):
+    pass
+
+
 class Skip:
     __metaclass__ = ABCMeta
 Skip.register(types.BuiltinFunctionType)
@@ -113,18 +117,32 @@ class vInode(Inode):
             ".repr",
             ]
 
-    def __init__(self, *argv, **kwarg):
-        Inode.__init__(self, *argv, **kwarg)
+    def __init__(self, name, parent=None, mode=0, storage=None,
+            obj=None, root=None, blacklist=None):
+        Inode.__init__(self, name, parent, mode, storage)
         if hasattr(self.parent, "stack"):
             self.stack = self.parent.stack
         else:
             self.stack = {}
-        self.root = False
+        self.root = root
+        self.blacklist = None
+        self.blacklist = blacklist or self.parent.blacklist
+        if isinstance(self.blacklist, List):
+            if self.absolute_path(stop=self.get_root()) in self.blacklist:
+                self.parent.remove(self)
+                raise Eperm()
         # force self.observe, bypass property setter
         self.__observe = None
+        self.observe = obj
         # repr hack
         if self.mode & stat.S_IFDIR:
             self.children[".repr"] = vRepr(".repr", self)
+
+    def get_root(self):
+        if self.root:
+            return self
+        else:
+            return self.parent.get_root()
 
     def _get_root_flag(self):
         return self.__root
@@ -183,14 +201,6 @@ class vInode(Inode):
     def register(self, obj):
         self.observe = obj
 
-    def create(self, name, mode=0, obj=None, root=False):
-
-        new = Inode.create(self, name, mode)
-        new.root = root
-        new.observe = obj
-
-        return new
-
     def sync(self):
         if self.observe is None:
             for (i, k) in self.children.items():
@@ -223,7 +233,7 @@ class vInode(Inode):
 
 class PyFS(Storage):
 
-    def create(self, obj, parent=None, name=None, root=False):
+    def create(self, obj, parent=None, name=None, **kwarg):
         if not parent:
             parent = self.root
 
@@ -244,11 +254,14 @@ class PyFS(Storage):
             return
 
         if isinstance(obj, File):
-            new = parent.create(name)
+            try:
+                new = parent.create(name)
+            except:
+                return
         else:
             try:
                 new = parent.create(name, mode=stat.S_IFDIR, obj=obj,
-                        root=root)
+                        **kwarg)
                 for item in _dir(obj):
                     self.create(_getattr(obj, item), new, item)
             except:
@@ -267,8 +280,7 @@ _PyFS_LOG = os.environ.get("PYFS_LOG", "False").lower() in (
     "yes", "true", "t", "1")
 
 # create FS
-pyfs = PyFS(vInode)
-pyfs.root.root = True
+pyfs = PyFS(vInode, root=True)
 
 # start logging
 if _PyFS_LOG:
@@ -293,15 +305,23 @@ srv_thread.setDaemon(True)
 srv_thread.start()
 
 
-def export(c):
-    old_init = c.__init__
+def export(*argv, **kwarg):
+    blacklist = kwarg.get("blacklist", [])
 
-    def new_init(self, *argv, **kwarg):
-        global pyfs
-        old_init(self, *argv, **kwarg)
-        pyfs.create(self, root=True)
-    c.__init__ = new_init
-    return c
+    def wrap(c):
+        old_init = c.__init__
+
+        def new_init(self, *argv, **kwarg):
+            global pyfs
+            old_init(self, *argv, **kwarg)
+            pyfs.create(self, root=True, blacklist=blacklist)
+        c.__init__ = new_init
+        return c
+
+    if len(argv):
+        return wrap(argv[0])
+    else:
+        return wrap
 
 # make the module safe for import
 __all__ = [export]
