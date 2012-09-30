@@ -275,7 +275,7 @@ if _PyFS_LOG:
     log = logInode("log", pyfs.root, maxlen=1024)
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)
-    handler = logging.StreamHandler(stream=log)
+    handler = logging.StreamHandler(log)
     handler.setLevel(logging.DEBUG)
     formatter = logging.Formatter(
         "%(asctime)s : %(levelname)s : %(message)s")
