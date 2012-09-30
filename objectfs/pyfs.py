@@ -147,6 +147,7 @@ class vInode(Inode):
             # we can not use callback here, 'cause it forces
             # weakref to generate different proxies for one
             # object and it breaks cycle reference detection
+            #
             # this won't work: lambda x: self.storage.remove(self.path)
             wp = weakref.proxy(obj)
         except:
