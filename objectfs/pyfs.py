@@ -56,7 +56,29 @@ def x_dir(obj):
         return [ x for x in obj.keys() if isinstance(x, types.StringType) ]
     return [ x for x in dir(obj) if not x.startswith("_") ]
 
+def _get_name(obj):
+    text = obj.__repr__()
+    if text.find("/") == -1:
+        return text
+    try:
+        return "%s [0x%x]" % (obj.__class__.__name__, id(obj))
+    except:
+        return "0x%x" % (id(obj))
+
+class vRepr(Inode):
+    def sync(self):
+        self.seek(0)
+        self.truncate()
+        if self.parent.observe is not None:
+            self.write(self.parent.observe.__repr__())
+
 class vInode(Inode):
+
+    special_names = [
+            ".",
+            "..",
+            ".repr",
+            ]
 
     def __init__(self, *argv, **kwarg):
         Inode.__init__(self, *argv, **kwarg)
@@ -67,6 +89,8 @@ class vInode(Inode):
         self.root = False
         # force self.observe, bypass property setter
         self.__observe = None
+        # repr hack
+        self.children[".repr"] = vRepr(".repr", self)
 
     def _get_root_flag(self):
         return self.__root
@@ -132,8 +156,12 @@ class vInode(Inode):
         if self.observe is None:
             for (i,k) in self.children.items():
                 try:
-                    x_dir(k.observe)
-                except:
+                    if hasattr(k, "observe"):
+                        x_dir(k.observe)
+                        if k.observe is not None:
+                            if _get_name(k.observe) != i:
+                                self.rename(i, _get_name(k.observe))
+                except Exception, e:
                     self.storage.remove(k.path)
             return
 
@@ -160,7 +188,14 @@ class PyFS(Storage):
             parent = self.root
 
         if not name:
-            name = repr(obj)
+            try:
+                # try to get the name, but the object can be
+                # not ready for __repr__
+                name = _get_name(obj)
+            except:
+                # if so, return temporary name, it will be
+                # changed later automatically
+                name = str(id(obj))
 
         if isinstance(obj, Skip):
             return
