@@ -18,16 +18,20 @@ PYFS_PORT -- tcp port; UNIX sockets are not supported
 PYFS_ADDRESS -- IPv4 address, use 0.0.0.0 to allow
     remote access
 PYFS_DEBUG -- turn on stderr debug output of py9p
+PYFS_LOG -- create /log inode
 """
 
 import types
 import stat
+import sys
 import os
 import py9p
 import weakref
+import logging
 from abc import ABCMeta
 from objectfs.vfs import Storage, Inode
 from objectfs.v9fs import v9fs
+from objectfs.utils import logInode
 from threading import Thread
 
 
@@ -259,10 +263,26 @@ _PyFS_ADDRESS = os.environ.get("PYFS_ADDRESS", "127.0.0.1")
 _PyFS_PORT = int(os.environ.get("PYFS_PORT", "10001"))
 _PyFS_DEBUG = os.environ.get("PYFS_DEBUG", "False").lower() in (
     "yes", "true", "t", "1")
+_PyFS_LOG = os.environ.get("PYFS_LOG", "False").lower() in (
+    "yes", "true", "t", "1")
 
 # create FS
 pyfs = PyFS(vInode)
 pyfs.root.root = True
+
+# start logging
+if _PyFS_LOG:
+    log = logInode("log", pyfs.root, maxlen=1024)
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
+    handler = logging.StreamHandler(stream=log)
+    handler.setLevel(logging.DEBUG)
+    formatter = logging.Formatter(
+        "%(asctime)s : %(levelname)s : %(message)s")
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    logger.removeHandler(logger.handlers[0])
+    logger.debug("PyFS started")
 
 # start the server
 srv = py9p.Server(listen=(_PyFS_ADDRESS, _PyFS_PORT),
