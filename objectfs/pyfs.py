@@ -199,7 +199,7 @@ class vInode(Inode):
                         _dir(k.observe)
                         if k.observe is not None:
                             if _get_name(k.observe) != i:
-                                self.rename(i, _get_name(k.observe))
+                                k.name = _get_name(k.observe)
                 except Exception, e:
                     self.storage.remove(k.path)
             return
