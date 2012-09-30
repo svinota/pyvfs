@@ -63,11 +63,15 @@ class Inode(object, StringIO):
         self._check_special(name)
         try:
             self.storage.unregister(self)
+            del self.parent.children[self.name]
+            logging.debug("rename %s -> %s" % (self.name, name))
         except:
             pass
         self.__name = name
         self.path = int(abs(hash(self.absolute_path())))
         self.storage.register(self)
+        if self.parent != self:
+            self.parent.children[name] = self
 
     name = property(_get_name, _set_name)
 
@@ -109,10 +113,8 @@ class Inode(object, StringIO):
         """
         Rename a child
         """
-        self._check_special(old_name, new_name)
-        self.children[new_name] = self.children[old_name]
-        self.children[new_name].name = new_name
-        del self.children[old_name]
+        # just a legacy interface
+        self.children[old_name].name = new_name
 
     def wstat(self, stat):
         # change uid?
