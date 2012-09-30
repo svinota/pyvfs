@@ -119,7 +119,8 @@ class vInode(Inode):
         # force self.observe, bypass property setter
         self.__observe = None
         # repr hack
-        self.children[".repr"] = vRepr(".repr", self)
+        if self.mode & stat.S_IFDIR:
+            self.children[".repr"] = vRepr(".repr", self)
 
     def _get_root_flag(self):
         return self.__root
