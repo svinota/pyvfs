@@ -7,6 +7,7 @@ import stat
 import time
 import pwd
 import grp
+import logging
 from StringIO import StringIO
 
 DEFAULT_DIR_MODE = 0755
@@ -49,6 +50,8 @@ class Inode(object, StringIO):
             self.children[".."] = self.parent
         else:
             self.mode = DEFAULT_FILE_MODE
+        logging.debug("created %s %o [%s]" % (self.absolute_path(),
+            self.mode, self.path))
 
     def __hash__(self):
         return self.path
