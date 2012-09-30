@@ -12,6 +12,8 @@ from StringIO import StringIO
 DEFAULT_DIR_MODE = 0755
 DEFAULT_FILE_MODE = 0644
 
+class Eperm(Exception): pass
+
 class Inode(object, StringIO):
     """
     VFS inode
@@ -66,7 +68,7 @@ class Inode(object, StringIO):
     def _check_special(self, *args):
         for i in args:
             if i in self.special_names:
-                raise py9p.ServerError(py9p.Eperm)
+                raise Eperm()
 
     def absolute_path(self):
         if (self.parent is not None) and (self.parent != self):
