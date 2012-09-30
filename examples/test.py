@@ -3,6 +3,7 @@
 from objectfs.pyfs import export
 import gc
 
+
 @export
 class Bala(object):
     def __init__(self, a):
@@ -32,7 +33,6 @@ while True:
         gc.collect()
     elif a == "ls":
         print e
-        print [ x for x in gc.get_objects() if isinstance(x,Bala) ]
+        print [x for x in gc.get_objects() if isinstance(x, Bala)]
     else:
         e.append(Bala(a))
-

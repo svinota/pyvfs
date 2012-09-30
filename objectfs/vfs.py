@@ -12,7 +12,10 @@ from StringIO import StringIO
 DEFAULT_DIR_MODE = 0755
 DEFAULT_FILE_MODE = 0644
 
-class Eperm(Exception): pass
+
+class Eperm(Exception):
+    pass
+
 
 class Inode(object, StringIO):
     """
@@ -135,6 +138,7 @@ class Inode(object, StringIO):
         else:
             return self.len
 
+
 class Storage(object):
     """
     High-level storage insterface. Implements a simple protocol
@@ -198,5 +202,3 @@ class Storage(object):
     def wstat(self, target, stat):
         f = self.checkout(target)
         f.wstat(stat)
-
-

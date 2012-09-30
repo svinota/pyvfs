@@ -6,11 +6,14 @@ import os
 import stat
 import py9p
 
+
 def mode2stat(mode):
     return (mode & 0777) | ((mode & py9p.DMDIR) >> 17)
 
+
 def mode2plan(mode):
     return (mode & 0777) | ((mode & stat.S_IFDIR) << 17)
+
 
 def inode2dir(inode):
     return py9p.Dir(
@@ -28,13 +31,14 @@ def inode2dir(inode):
             gid=inode.gid,
             muid=inode.muid)
 
-# 8<----------------------------------------------------------------------------
+# 8<---------------------------------------------------------------------------
 #
 # 9p2000 specific layer, that represents internal storage protocol in the
 # terms of 9p2000 file system. One MUST extract Inode class to the layer
 # above, removeing all py9p references. A specific overloaded v9inode can
 # be implemented on the top of it.
 #
+
 
 class v9fs(py9p.Server):
     """
@@ -62,7 +66,7 @@ class v9fs(py9p.Server):
         f.sync()
         srv.respond(req, None)
 
-    def walk(self, srv, req, fid = None):
+    def walk(self, srv, req, fid=None):
 
         fd = fid or req.fid
         f = self.storage.checkout(fd.qid.path)
@@ -98,8 +102,8 @@ class v9fs(py9p.Server):
         srv.respond(req, None)
 
     def write(self, srv, req):
-        req.ofcall.count = self.storage.write(req.fid.qid.path, req.ifcall.data,
-            req.ifcall.offset)
+        req.ofcall.count = self.storage.write(req.fid.qid.path,
+            req.ifcall.data, req.ifcall.offset)
         srv.respond(req, None)
 
     def clunk(self, srv, req):
@@ -131,5 +135,3 @@ class v9fs(py9p.Server):
             req.ofcall.count = len(req.ofcall.data)
 
         srv.respond(req, None)
-
-

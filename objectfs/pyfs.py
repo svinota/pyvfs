@@ -11,7 +11,10 @@ from objectfs.vfs import Storage, Inode
 from objectfs.v9fs import v9fs
 from threading import Thread
 
-class Eexist(Exception): pass
+
+class Eexist(Exception):
+    pass
+
 
 class Skip:
     __metaclass__ = ABCMeta
@@ -24,12 +27,14 @@ Skip.register(types.GeneratorType)
 Skip.register(types.ModuleType)
 Skip.register(types.UnboundMethodType)
 
+
 class List:
     __metaclass__ = ABCMeta
 List.register(list)
 List.register(set)
 List.register(tuple)
 List.register(frozenset)
+
 
 class File:
     __metaclass__ = ABCMeta
@@ -42,6 +47,7 @@ File.register(types.StringType)
 File.register(types.UnicodeType)
 File.register(types.NoneType)
 
+
 def x_get(obj, item):
     if isinstance(obj, List):
         return obj[int(item)]
@@ -49,12 +55,14 @@ def x_get(obj, item):
         return obj[item]
     return getattr(obj, item)
 
+
 def x_dir(obj):
     if isinstance(obj, List):
-        return [ str(x) for x in xrange(len(obj)) ]
+        return [str(x) for x in xrange(len(obj))]
     if isinstance(obj, types.DictType):
-        return [ x for x in obj.keys() if isinstance(x, types.StringType) ]
-    return [ x for x in dir(obj) if not x.startswith("_") ]
+        return [x for x in obj.keys() if isinstance(x, types.StringType)]
+    return [x for x in dir(obj) if not x.startswith("_")]
+
 
 def _get_name(obj):
     text = obj.__repr__()
@@ -65,12 +73,14 @@ def _get_name(obj):
     except:
         return "0x%x" % (id(obj))
 
+
 class vRepr(Inode):
     def sync(self):
         self.seek(0)
         self.truncate()
         if self.parent.observe is not None:
             self.write(self.parent.observe.__repr__())
+
 
 class vInode(Inode):
 
@@ -115,11 +125,15 @@ class vInode(Inode):
             return
 
         try:
-            wp = weakref.proxy(obj) #, lambda x: self.storage.remove(self.path))
+            # we can not use callback here, 'cause it forces
+            # weakref to generate different proxies for one
+            # object and it breaks cycle reference detection
+            # this won't work: lambda x: self.storage.remove(self.path)
+            wp = weakref.proxy(obj)
         except:
             wp = obj
 
-        if self.stack.has_key(id(wp)):
+        if id(wp) in self.stack.keys():
             self.storage.remove(self.path)
             raise Eexist()
         try:
@@ -127,7 +141,7 @@ class vInode(Inode):
         except:
             pass
         self.stack[id(wp)] = True
- 
+
         if not self.root:
             return
 
@@ -154,7 +168,7 @@ class vInode(Inode):
 
     def sync(self):
         if self.observe is None:
-            for (i,k) in self.children.items():
+            for (i, k) in self.children.items():
                 try:
                     if hasattr(k, "observe"):
                         x_dir(k.observe)
@@ -180,6 +194,7 @@ class vInode(Inode):
             self.seek(0)
             self.truncate()
             self.write(str(x_get(self.parent.observe, self.name)))
+
 
 class PyFS(Storage):
 
@@ -227,13 +242,13 @@ srv_thread = Thread(target=srv.serve)
 srv_thread.setDaemon(True)
 srv_thread.start()
 
+
 def export(c):
     old_init = c.__init__
+
     def new_init(self, *argv, **kwarg):
         global pyfs
         old_init(self, *argv, **kwarg)
         pyfs.create(self, root=True)
     c.__init__ = new_init
     return c
-
-
