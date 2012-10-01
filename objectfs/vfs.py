@@ -99,6 +99,7 @@ class Inode(object, StringIO):
         Remove a child from a directory
         """
         self._check_special(child.name)
+        logging.debug("remove child %s [%s]" % (child.name, child.path))
         del self.children[child.name]
 
     def create(self, name, mode=0, **kwarg):
@@ -163,12 +164,16 @@ class Storage(object):
         """
         Register a new inode in the dictionary
         """
+        logging.debug("register %s [%s] [%i inodes in the storage]" % (
+            inode.absolute_path(), inode.path, len(self.files.keys())))
         self.files[inode.path] = inode
 
     def unregister(self, inode):
         """
         Remove an inode from the dictionary
         """
+        logging.debug("unregister %s [%s] [%i inodes in the storage]" % (
+            inode.absolute_path(), inode.path, len(self.files.keys())))
         del self.files[inode.path]
 
     def create(self, name, parent, mode=0):
@@ -176,7 +181,7 @@ class Storage(object):
         Create an inode
         """
         new = parent.create(name, mode)
-        self.files[new.path] = new
+        self.register(new)
         return new
 
     def checkout(self, target):
@@ -205,7 +210,7 @@ class Storage(object):
     def remove(self, target):
         f = self.checkout(target)
         f.parent.remove(f)
-        del self.files[target]
+        self.unregister(f)
 
     def wstat(self, target, stat):
         f = self.checkout(target)
