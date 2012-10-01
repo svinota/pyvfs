@@ -8,6 +8,8 @@ import time
 import pwd
 import grp
 import logging
+import threading
+import types
 from StringIO import StringIO
 
 DEFAULT_DIR_MODE = 0755
@@ -18,7 +20,34 @@ class Eperm(Exception):
     pass
 
 
-class Inode(object, StringIO):
+class ThreadSafe(object):
+
+    def __init__(self):
+        object.__init__(self)
+        self.lock = threading.RLock()
+
+    def __getattribute__(self, attr):
+        obj = object.__getattribute__(self, attr)
+
+        def wrapped(*argv, **kwarg):
+            self.lock.acquire()
+            e = None
+            try:
+                ret = obj(*argv, **kwarg)
+            except Exception, e:
+                pass
+            self.lock.release()
+            if e:
+                raise e
+            return ret
+
+        if isinstance(obj, types.MethodType):
+            return wrapped
+        else:
+            return obj
+
+
+class Inode(ThreadSafe, StringIO):
     """
     VFS inode
     """
@@ -30,6 +59,7 @@ class Inode(object, StringIO):
 
     def __init__(self, name, parent=None, mode=0, storage=None):
 
+        ThreadSafe.__init__(self)
         StringIO.__init__(self)
 
         self.parent = parent or self
@@ -147,7 +177,7 @@ class Inode(object, StringIO):
             return self.len
 
 
-class Storage(object):
+class Storage(ThreadSafe):
     """
     High-level storage insterface. Implements a simple protocol
     for the file management and file lookup dictionary.
@@ -156,6 +186,7 @@ class Storage(object):
     class MUST support the interface... that should be defined :)
     """
     def __init__(self, inode=Inode, **kwarg):
+        ThreadSafe.__init__(self)
         self.files = {}
         self.root = inode(name="/", mode=stat.S_IFDIR, storage=self,
                 **kwarg)
