@@ -129,7 +129,7 @@ class vInode(Inode):
         self.blacklist = blacklist or self.parent.blacklist
         if isinstance(self.blacklist, List):
             if self.absolute_path(stop=self.get_root()) in self.blacklist:
-                self.parent.remove(self)
+                self.storage.remove(self.path)
                 raise Eperm()
         # force self.observe, bypass property setter
         self.__observe = None
