@@ -1,10 +1,22 @@
 """
+objectfs.utils -- utility classes
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Utility classes for VFS
 """
 from collections import deque
 from objectfs.vfs import Inode
 
 
 class logInode(Inode):
+    """
+    Deque-based log file. Should be read-only on the
+    filesystem. Can be used as a stream for Python
+    ``logging.StreamHandler()`` objects. Stores ``maxlen``
+    of records, addition of records above ``maxlen`` at the same
+    time discards discards old records.
+    """
+
     def __init__(self, name, parent, maxlen=30):
         Inode.__init__(self, name, parent)
         self.deque = deque(maxlen=maxlen)

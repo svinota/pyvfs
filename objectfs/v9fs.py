@@ -1,7 +1,9 @@
 """
-9p2000
-"""
+objectfs.v9fs -- 9pfs connector
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+9p2000 abstraction layer, is used to plug VFS into py9p
+"""
 import os
 import stat
 import py9p

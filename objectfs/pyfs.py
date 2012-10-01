@@ -1,24 +1,48 @@
 """
+objectfs.pyfs -- exporting Python objects as files
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 The module should be used to create filesystem that
 represents Python objects as directories and files.
 This allows easy inspection of the objects in runtime
 with any file management tool, e.g. bash.
-
 By now the module uses 9p2000 filesystem and creates
-it just after the import call. You can mount it with
-`mount -t 9p -o port=10001 127.0.0.1 /mnt/debugfs` on
+it just after the import call. You can mount it on
 your Linux system, or you can use FUSE, or any 9p
-client.
+client::
+
+    mount -t 9p -o ro,port=10001 127.0.0.1 /mnt/debugfs
 
 By default it listens on tcp 127.0.0.1:10001, but you
 can change the behaviour with environment variables:
 
-PYFS_PORT -- tcp port; UNIX sockets are not supported
-    by now, but they are planned
-PYFS_ADDRESS -- IPv4 address, use 0.0.0.0 to allow
-    remote access
-PYFS_DEBUG -- turn on stderr debug output of py9p
-PYFS_LOG -- create /log inode
+ * PYFS_PORT -- tcp port; UNIX sockets are not supported
+   by now, but they are planned
+ * PYFS_ADDRESS -- IPv4 address, use 0.0.0.0 to allow
+   remote access
+ * PYFS_DEBUG -- turn on stderr debug output of py9p
+ * PYFS_LOG -- create /log inode
+
+.. note::
+    This module creates a server thread just after the import,
+    without any explicit calls. The thread requires no attention
+    and stop automatically as the script exits. No cleanup
+    procedure is required.
+
+.. warning::
+    If you use the system ``mount`` and the kernel implementation
+    of 9pfs to mount your script, be very careful:
+    the cases of kernel crash were reported. System kernel,
+    I mean.
+
+.. note::
+    Mount your script only in read-only mode, since read-write
+    access is not tested yet and nobody knows what the hell
+    can happen.
+
+.. warning::
+    No authentication is implemented yet. Do not expose the socket
+    to the public access.
 """
 
 import types
@@ -102,6 +126,18 @@ def _get_name(obj):
 
 
 class vRepr(Inode):
+    """
+    Sometimes ``__repr__()`` returns a string that can not be used
+    as a filename. In this case, the object's inode will be named
+    in some other way, but you can always retrieve the original
+    representation from the special file ``.repr``, placed in every
+    directory.
+
+    As a side-effect, with ``.repr`` you can get text representations
+    of Python lists, tuples and dicts just as you do in the Python
+    command line.
+    """
+
     def sync(self):
         self.seek(0)
         self.truncate()
@@ -110,6 +146,17 @@ class vRepr(Inode):
 
 
 class vInode(Inode):
+    """
+    An inode, that can represent and track a Python object.
+    The tracked object is referenced by vInode.observe property,
+    which is weakref.proxy, if possible.
+
+    Only root object of the tree is tracked, all the children
+    are resolved in runtime. It is slower, but it allows to
+    avoid unnecessary object references, thus allowing GC to
+    work normally. All GC'ed objects automatically disappear
+    from the filesystem.
+    """
 
     special_names = [
             ".",
@@ -232,8 +279,29 @@ class vInode(Inode):
 
 
 class PyFS(Storage):
+    """
+    PyFS storage class. Though there is no limit of PyFS
+    instances, the module starts only one storage.
+    """
 
     def create(self, obj, parent=None, name=None, **kwarg):
+        """
+        Create an object inode and all the subtree. If ``parent``
+        is not defined, attach new inode to the storage root.
+
+        Objects of type ``File`` (see ABC ``File`` above in the code)
+        will be represented as files. Private attributes,
+        methods and other objects of ABC ``Skip`` will be silently
+        skipped. All other attributes will be represented as
+        directories, unless the inode creation fails 'cause of
+        some reason.
+
+        If ``name`` parameter is not defined, or the object is
+        a member of an object of a complex builtin type like
+        list or set, the object will be named automatically. Please
+        note that you can affect the autonaming with ``__repr__()``
+        method.
+        """
         if not parent:
             parent = self.root
 
@@ -306,6 +374,38 @@ srv_thread.start()
 
 
 def export(*argv, **kwarg):
+    """
+    The decorator, that is used to export objects to the filesystem.
+    It can be used in two ways. The first, simplest, way allows you just
+    to catch the object creation and export the whole object tree
+    as is::
+
+        @export
+        class Example(object):
+
+            ...
+
+    Or you can provide named parameters::
+
+        @export(blacklist=["/bala","/dala"])
+        class Example(object):
+            # these two parameters will not be exported:
+            bala = None
+            dala = None
+            # but this one will be:
+            vala = None
+
+            ...
+
+    Right now supported parameters are:
+        * **blacklist** -- The list of paths from the **object tree root**,
+          that should not be exported. For example, if your object has an
+          attribute "bala" and you want to hide it, you should use
+          ``"/bala"`` in your blacklist. The same is for children, if you
+          want to hide the child "dala" of attribute "bala", you should
+          use ``"/bala/dala"``.
+        * **basedir** -- Not implemented yet.
+    """
     blacklist = kwarg.get("blacklist", [])
 
     def wrap(c):
@@ -324,4 +424,4 @@ def export(*argv, **kwarg):
         return wrap
 
 # make the module safe for import
-__all__ = [export]
+__all__ = ["export"]
