@@ -4,13 +4,13 @@
    contain the root `toctree` directive.
 
 Welcome to PyVFS's documentation!
-================================
+=================================
 
 .. note::
     This is pre-alpha. We're also surprised, that it works, you know.
 
 PyVFS howto
-----------
+-----------
 
 .. toctree::
     :maxdepth: 3
@@ -19,7 +19,7 @@ PyVFS howto
     second_steps
 
 Implementation and API
----------------------------
+----------------------
 
 .. toctree::
     :maxdepth: 2
