@@ -71,7 +71,7 @@ class Skip:
 Skip.register(types.BuiltinFunctionType)
 Skip.register(types.BuiltinMethodType)
 Skip.register(types.MethodType)
-Skip.register(types.ClassType)
+Skip.register(type)
 Skip.register(types.FunctionType)
 Skip.register(types.GeneratorType)
 Skip.register(types.ModuleType)
@@ -88,29 +88,29 @@ List.register(frozenset)
 
 class File:
     __metaclass__ = ABCMeta
-File.register(types.BooleanType)
+File.register(bool)
 File.register(types.FileType)
-File.register(types.FloatType)
-File.register(types.IntType)
-File.register(types.LongType)
-File.register(types.StringType)
-File.register(types.UnicodeType)
-File.register(types.NoneType)
+File.register(float)
+File.register(int)
+File.register(int)
+File.register(bytes)
+File.register(str)
+File.register(type(None))
 
 
 def _getattr(obj, item):
     if isinstance(obj, List):
         return obj[int(item)]
-    if isinstance(obj, types.DictType):
+    if isinstance(obj, dict):
         return obj[item]
     return getattr(obj, item)
 
 
 def _dir(obj):
     if isinstance(obj, List):
-        return [str(x) for x in xrange(len(obj))]
-    if isinstance(obj, types.DictType):
-        return [x for x in obj.keys() if isinstance(x, types.StringType)]
+        return [str(x) for x in range(len(obj))]
+    if isinstance(obj, dict):
+        return [x for x in list(obj.keys()) if isinstance(x, bytes)]
     return [x for x in dir(obj) if not x.startswith("_")]
 
 
@@ -222,7 +222,7 @@ class vInode(Inode):
         except:
             wp = obj
 
-        if id(wp) in self.stack.keys():
+        if id(wp) in list(self.stack.keys()):
             self.storage.remove(self.path)
             raise Eexist()
         try:
@@ -249,7 +249,7 @@ class vInode(Inode):
 
     def sync(self):
         if self.observe is None:
-            for (i, k) in self.children.items():
+            for (i, k) in list(self.children.items()):
                 try:
                     if hasattr(k, "observe"):
                         _dir(k.observe)
