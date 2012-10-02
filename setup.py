@@ -4,7 +4,7 @@ from distutils.core import setup
 
 # bump version
 setup(name='pyvfs',
-    version='0.1.1',
+    version='0.1.2',
     description='Python VFS library',
     author='Peter V. Saveliev',
     author_email='peet@altlinux.org',

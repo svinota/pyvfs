@@ -45,6 +45,7 @@ dist: manifest
 check:
 	pep8 .
 	pyflakes .
+	2to3 pyvfs
 
 build:
 	:
