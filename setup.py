@@ -9,7 +9,7 @@ setup(name='pyvfs',
     author='Peter V. Saveliev',
     author_email='peet@altlinux.org',
     url='http://peet.spb.ru/pyvfs/',
-    license="GPLv3",
+    license="GPL",
     packages=[
         'pyvfs'
         ]
