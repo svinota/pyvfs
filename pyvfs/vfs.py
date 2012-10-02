@@ -14,10 +14,10 @@ import grp
 import logging
 import threading
 import types
-from StringIO import StringIO
+from io import BytesIO
 
-DEFAULT_DIR_MODE = 0755
-DEFAULT_FILE_MODE = 0644
+DEFAULT_DIR_MODE = 0o755
+DEFAULT_FILE_MODE = 0o644
 
 
 class Eperm(Exception):
@@ -38,7 +38,7 @@ class ThreadSafe(object):
             e = None
             try:
                 ret = obj(*argv, **kwarg)
-            except Exception, e:
+            except Exception as e:
                 pass
             self.lock.release()
             if e:
@@ -51,7 +51,7 @@ class ThreadSafe(object):
             return obj
 
 
-class Inode(ThreadSafe, StringIO):
+class Inode(ThreadSafe, BytesIO):
     """
     VFS inode
     """
@@ -64,7 +64,7 @@ class Inode(ThreadSafe, StringIO):
     def __init__(self, name, parent=None, mode=0, storage=None):
 
         ThreadSafe.__init__(self)
-        StringIO.__init__(self)
+        BytesIO.__init__(self)
 
         self.parent = parent or self
         self.storage = storage or parent.storage
@@ -168,7 +168,8 @@ class Inode(ThreadSafe, StringIO):
                 self.gid = stat.gid
         # change mode?
         if stat.mode != 0xFFFFFFFF:
-            self.mode = ((self.mode & 07777) ^ self.mode) | (stat.mode & 07777)
+            self.mode = ((self.mode & 0o7777) ^ self.mode) |\
+                    (stat.mode & 0o7777)
         # change name?
         if stat.name:
             self.parent.rename(self.name, stat.name)
@@ -176,9 +177,9 @@ class Inode(ThreadSafe, StringIO):
     @property
     def length(self):
         if self.mode & stat.S_IFDIR:
-            return len(self.children.keys())
+            return len(list(self.children.keys()))
         else:
-            return self.len
+            return self.seek(0, 2)
 
 
 class Storage(ThreadSafe):
@@ -200,7 +201,7 @@ class Storage(ThreadSafe):
         Register a new inode in the dictionary
         """
         logging.debug("register %s [%s] [%i inodes in the storage]" % (
-            inode.absolute_path(), inode.path, len(self.files.keys())))
+            inode.absolute_path(), inode.path, len(list(self.files.keys()))))
         self.files[inode.path] = inode
 
     def unregister(self, inode):
@@ -208,7 +209,7 @@ class Storage(ThreadSafe):
         Remove an inode from the dictionary
         """
         logging.debug("unregister %s [%s] [%i inodes in the storage]" % (
-            inode.absolute_path(), inode.path, len(self.files.keys())))
+            inode.absolute_path(), inode.path, len(list(self.files.keys()))))
         del self.files[inode.path]
 
     def create(self, name, parent, mode=0):

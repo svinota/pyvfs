@@ -9,11 +9,11 @@ import py9p
 
 
 def mode2stat(mode):
-    return (mode & 0777) | ((mode & py9p.DMDIR) >> 17)
+    return (mode & 0o777) | ((mode & py9p.DMDIR) >> 17)
 
 
 def mode2plan(mode):
-    return (mode & 0777) | ((mode & stat.S_IFDIR) << 17)
+    return (mode & 0o777) | ((mode & stat.S_IFDIR) << 17)
 
 
 def inode2dir(inode):
@@ -73,7 +73,7 @@ class v9fs(py9p.Server):
         f = self.storage.checkout(fd.qid.path)
         f.sync()
 
-        for (i, k) in f.children.items():
+        for (i, k) in list(f.children.items()):
             if req.ifcall.wname[0] == i:
                 qid = py9p.Qid((mode2plan(k.mode) >> 24) & py9p.QTDIR, 0,
                     hash(k))
@@ -125,7 +125,7 @@ class v9fs(py9p.Server):
         if mode2plan(f.mode) & py9p.DMDIR:
             f.sync()
             req.ofcall.stat = []
-            for (i, k) in f.children.items():
+            for (i, k) in list(f.children.items()):
                 if i not in (".", ".."):
                     req.ofcall.stat.append(inode2dir(k))
         else:
