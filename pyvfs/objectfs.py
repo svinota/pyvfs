@@ -138,7 +138,7 @@ class vRepr(Inode):
         self.seek(0)
         self.truncate()
         if self.parent.observe is not None:
-            self.write(self.parent.observe.__repr__())
+            self.write(bytes(self.parent.observe.__repr__()))
 
 
 class vInode(Inode):
