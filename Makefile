@@ -42,6 +42,10 @@ manifest: clean
 dist: manifest
 	${python} setup.py sdist
 
+check:
+	pep8 .
+	pyflakes .
+
 build:
 	:
 
