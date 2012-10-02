@@ -11,9 +11,7 @@ import stat
 import time
 import pwd
 import grp
-import logging
 import threading
-import types
 from io import BytesIO
 
 DEFAULT_DIR_MODE = 0o755
@@ -24,34 +22,7 @@ class Eperm(Exception):
     pass
 
 
-class ThreadSafe(object):
-
-    def __init__(self):
-        object.__init__(self)
-        self.lock = threading.RLock()
-
-    def __getattribute__(self, attr):
-        obj = object.__getattribute__(self, attr)
-
-        def wrapped(*argv, **kwarg):
-            self.lock.acquire()
-            e = None
-            try:
-                ret = obj(*argv, **kwarg)
-            except Exception as e:
-                pass
-            self.lock.release()
-            if e:
-                raise e
-            return ret
-
-        if isinstance(obj, types.MethodType):
-            return wrapped
-        else:
-            return obj
-
-
-class Inode(ThreadSafe, BytesIO):
+class Inode(BytesIO, object):
     """
     VFS inode
     """
@@ -63,7 +34,6 @@ class Inode(ThreadSafe, BytesIO):
 
     def __init__(self, name, parent=None, mode=0, storage=None):
 
-        ThreadSafe.__init__(self)
         BytesIO.__init__(self)
 
         self.parent = parent or self
@@ -84,8 +54,6 @@ class Inode(ThreadSafe, BytesIO):
             self.children[".."] = self.parent
         else:
             self.mode = DEFAULT_FILE_MODE
-        logging.debug("created %s %o [%s]" % (self.absolute_path(),
-            self.mode, self.path))
 
     def __hash__(self):
         return self.path
@@ -98,7 +66,6 @@ class Inode(ThreadSafe, BytesIO):
         try:
             self.storage.unregister(self)
             del self.parent.children[self.name]
-            logging.debug("rename %s -> %s" % (self.name, name))
         except:
             pass
         self.__name = name
@@ -133,7 +100,6 @@ class Inode(ThreadSafe, BytesIO):
         Remove a child from a directory
         """
         self._check_special(child.name)
-        logging.debug("remove child %s [%s]" % (child.name, child.path))
         del self.children[child.name]
 
     def create(self, name, mode=0, **kwarg):
@@ -182,7 +148,7 @@ class Inode(ThreadSafe, BytesIO):
             return self.seek(0, 2)
 
 
-class Storage(ThreadSafe):
+class Storage(object):
     """
     High-level storage insterface. Implements a simple protocol
     for the file management and file lookup dictionary.
@@ -191,8 +157,8 @@ class Storage(ThreadSafe):
     class MUST support the interface... that should be defined :)
     """
     def __init__(self, inode=Inode, **kwarg):
-        ThreadSafe.__init__(self)
         self.files = {}
+        self.lock = threading.RLock()
         self.root = inode(name="/", mode=stat.S_IFDIR, storage=self,
                 **kwarg)
 
@@ -200,54 +166,63 @@ class Storage(ThreadSafe):
         """
         Register a new inode in the dictionary
         """
-        logging.debug("register %s [%s] [%i inodes in the storage]" % (
-            inode.absolute_path(), inode.path, len(list(self.files.keys()))))
         self.files[inode.path] = inode
 
     def unregister(self, inode):
         """
         Remove an inode from the dictionary
         """
-        logging.debug("unregister %s [%s] [%i inodes in the storage]" % (
-            inode.absolute_path(), inode.path, len(list(self.files.keys()))))
         del self.files[inode.path]
 
     def create(self, name, parent, mode=0):
         """
         Create an inode
         """
+        self.lock.acquire()
         new = parent.create(name, mode)
         self.register(new)
+        self.lock.release()
         return new
 
     def checkout(self, target):
         return self.files[target]
 
     def commit(self, target):
+        self.lock.acquire()
         f = self.checkout(target)
         if f.writelock:
             f.writelock = False
             f.commit()
+        self.lock.release()
 
     def write(self, target, data, offset=0):
+        self.lock.acquire()
         f = self.checkout(target)
         f.writelock = True
         f.seek(offset, os.SEEK_SET)
         f.write(data)
+        self.lock.release()
         return len(data)
 
     def read(self, target, size, offset=0):
+        self.lock.acquire()
         f = self.checkout(target)
         if offset == 0:
             f.sync()
         f.seek(offset, os.SEEK_SET)
-        return f.read(size)
+        data = f.read(size)
+        self.lock.release()
+        return data
 
     def remove(self, target):
+        self.lock.acquire()
         f = self.checkout(target)
         f.parent.remove(f)
         self.unregister(f)
+        self.lock.release()
 
     def wstat(self, target, stat):
+        self.lock.acquire()
         f = self.checkout(target)
         f.wstat(stat)
+        self.lock.release()
