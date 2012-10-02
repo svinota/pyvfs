@@ -3,8 +3,10 @@ objectfs
 
 Pre-alfa version of a simple userspace virtual file system implementation.
 
-Usage: see examples.
+ * Documentation: http://peet.spb.ru/pyfs/
+ * Installation: make install
+ * Requirements: Python >= 2.6, py9p (https://github.com/svinota/py9p)
 
-You should have objectfs module in the PYTHONPATH as well as the particular
-FS stack that is used by VFS (right now only py9p is supported).
+You can also use the library without installation, but in this case you
+should set up PYTHONPATH manually.
 
