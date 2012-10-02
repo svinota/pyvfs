@@ -66,8 +66,7 @@ class Eperm(Exception):
     pass
 
 
-class Skip:
-    __metaclass__ = ABCMeta
+Skip = ABCMeta("Skip", (object,), {})
 Skip.register(types.BuiltinFunctionType)
 Skip.register(types.BuiltinMethodType)
 Skip.register(types.MethodType)
@@ -78,16 +77,14 @@ Skip.register(types.ModuleType)
 Skip.register(types.UnboundMethodType)
 
 
-class List:
-    __metaclass__ = ABCMeta
+List = ABCMeta("List", (object,), {})
 List.register(list)
 List.register(set)
 List.register(tuple)
 List.register(frozenset)
 
 
-class File:
-    __metaclass__ = ABCMeta
+File = ABCMeta("File", (object,), {})
 File.register(bool)
 File.register(types.FileType)
 File.register(float)
