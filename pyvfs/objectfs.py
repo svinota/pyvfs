@@ -47,7 +47,6 @@ can change the behaviour with environment variables:
 
 import types
 import stat
-import sys
 import os
 import py9p
 import weakref
@@ -257,7 +256,7 @@ class vInode(Inode):
                         if k.observe is not None:
                             if _get_name(k.observe) != i:
                                 k.name = _get_name(k.observe)
-                except Exception, e:
+                except:
                     self.storage.remove(k.path)
             return
 

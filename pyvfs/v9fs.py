@@ -4,7 +4,6 @@ pyvfs.v9fs -- 9pfs connector
 
 9p2000 abstraction layer, is used to plug VFS into py9p
 """
-import os
 import stat
 import py9p
 
@@ -91,7 +90,7 @@ class v9fs(py9p.Server):
 
     def wstat(self, srv, req):
 
-        f = self.storage.checkout(req.fid.qid.path)
+        self.storage.checkout(req.fid.qid.path)
         s = req.ifcall.stat[0]
         self.storage.wstat(req.fid.qid.path, s)
         srv.respond(req, None)
