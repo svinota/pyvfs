@@ -367,7 +367,7 @@ if _PYVFS_LOG:
 srv = py9p.Server(listen=(_PYVFS_ADDRESS, _PYVFS_PORT),
     chatty=_PYVFS_DEBUG, dotu=True)
 srv.mount(v9fs(fs))
-srv_thread = Thread(target=srv.serve)
+srv_thread = Thread(target=srv.serve, name="PyVFS for ObjectFS at 0x%x" % (id(fs)))
 srv_thread.setDaemon(True)
 srv_thread.start()
 
