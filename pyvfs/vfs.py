@@ -1,5 +1,5 @@
 """
-objectfs.vfs -- abstract VFS layer
+pyvfs.vfs -- abstract VFS layer
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Internal VFS protocol. You can use this module to build your own

@@ -1,13 +1,13 @@
 # 	Copyright (c) 2012 Peter V. Saveliev
 #
-# 	This file is part of PyFS project.
+# 	This file is part of PyVFS project.
 #
-# 	PyFS is free software; you can redistribute it and/or modify
+# 	PyVFS is free software; you can redistribute it and/or modify
 # 	it under the terms of the GNU General Public License as published by
 # 	the Free Software Foundation; either version 3 of the License, or
 # 	(at your option) any later version.
 #
-# 	PyFS is distributed in the hope that it will be useful,
+# 	PyVFS is distributed in the hope that it will be useful,
 # 	but WITHOUT ANY WARRANTY; without even the implied warranty of
 # 	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # 	GNU General Public License for more details.
@@ -37,7 +37,7 @@ clean:
 	find . -name "*pyc" -exec rm -f "{}" \;
 
 manifest: clean
-	find objectfs -name '*.py' >MANIFEST
+	find pyvfs -name '*.py' >MANIFEST
 
 dist: manifest
 	${python} setup.py sdist

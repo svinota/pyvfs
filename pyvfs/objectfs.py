@@ -1,6 +1,6 @@
 """
-objectfs.pyfs -- exporting Python objects as files
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+pyvfs.objectfs -- exporting Python objects as files
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The module should be used to create filesystem that
 represents Python objects as directories and files.
@@ -16,12 +16,12 @@ client::
 By default it listens on tcp 127.0.0.1:10001, but you
 can change the behaviour with environment variables:
 
- * PYFS_PORT -- tcp port; UNIX sockets are not supported
+ * PYVFS_PORT -- tcp port; UNIX sockets are not supported
    by now, but they are planned
- * PYFS_ADDRESS -- IPv4 address, use 0.0.0.0 to allow
+ * PYVFS_ADDRESS -- IPv4 address, use 0.0.0.0 to allow
    remote access
- * PYFS_DEBUG -- turn on stderr debug output of py9p
- * PYFS_LOG -- create /log inode
+ * PYVFS_DEBUG -- turn on stderr debug output of py9p
+ * PYVFS_LOG -- create /log inode
 
 .. note::
     This module creates a server thread just after the import,
@@ -53,9 +53,9 @@ import py9p
 import weakref
 import logging
 from abc import ABCMeta
-from objectfs.vfs import Storage, Inode
-from objectfs.v9fs import v9fs
-from objectfs.utils import logInode
+from pyvfs.vfs import Storage, Inode
+from pyvfs.v9fs import v9fs
+from pyvfs.utils import logInode
 from threading import Thread
 
 
@@ -278,10 +278,10 @@ class vInode(Inode):
             self.write(str(_getattr(self.parent.observe, self.name)))
 
 
-class PyFS(Storage):
+class ObjectFS(Storage):
     """
-    PyFS storage class. Though there is no limit of PyFS
-    instances, the module starts only one storage.
+    ObjectFS storage class. Though there is no limit of
+    ObjectFS instances, the module starts only one storage.
     """
 
     def create(self, obj, parent=None, name=None, **kwarg):
@@ -340,19 +340,19 @@ class PyFS(Storage):
 # 8<-----------------------------------------------------------------------
 #
 # configure file server
-_PyFS_ADDRESS = os.environ.get("PYFS_ADDRESS", "127.0.0.1")
-_PyFS_PORT = int(os.environ.get("PYFS_PORT", "10001"))
-_PyFS_DEBUG = os.environ.get("PYFS_DEBUG", "False").lower() in (
+_PYVFS_ADDRESS = os.environ.get("PYVFS_ADDRESS", "127.0.0.1")
+_PYVFS_PORT = int(os.environ.get("PYVFS_PORT", "10001"))
+_PYVFS_DEBUG = os.environ.get("PYVFS_DEBUG", "False").lower() in (
     "yes", "true", "t", "1")
-_PyFS_LOG = os.environ.get("PYFS_LOG", "False").lower() in (
+_PYVFS_LOG = os.environ.get("PYVFS_LOG", "False").lower() in (
     "yes", "true", "t", "1")
 
 # create FS
-pyfs = PyFS(vInode, root=True)
+fs = ObjectFS(vInode, root=True)
 
 # start logging
-if _PyFS_LOG:
-    log = logInode("log", pyfs.root, maxlen=1024)
+if _PYVFS_LOG:
+    log = logInode("log", fs.root, maxlen=1024)
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)
     handler = logging.StreamHandler(log)
@@ -362,12 +362,12 @@ if _PyFS_LOG:
     handler.setFormatter(formatter)
     logger.addHandler(handler)
     logger.removeHandler(logger.handlers[0])
-    logger.debug("PyFS started")
+    logger.debug("PyVFS started")
 
 # start the server
-srv = py9p.Server(listen=(_PyFS_ADDRESS, _PyFS_PORT),
-    chatty=_PyFS_DEBUG, dotu=True)
-srv.mount(v9fs(pyfs))
+srv = py9p.Server(listen=(_PYVFS_ADDRESS, _PYVFS_PORT),
+    chatty=_PYVFS_DEBUG, dotu=True)
+srv.mount(v9fs(fs))
 srv_thread = Thread(target=srv.serve)
 srv_thread.setDaemon(True)
 srv_thread.start()
@@ -412,9 +412,9 @@ def export(*argv, **kwarg):
         old_init = c.__init__
 
         def new_init(self, *argv, **kwarg):
-            global pyfs
+            global fs
             old_init(self, *argv, **kwarg)
-            pyfs.create(self, root=True, blacklist=blacklist)
+            fs.create(self, root=True, blacklist=blacklist)
         c.__init__ = new_init
         return c
 

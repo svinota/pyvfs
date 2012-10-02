@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 """
-Simplest PyFS example
+Simplest PyVFS example
 """
 
-# start PyFS thread and import the decorator
-from objectfs.pyfs import export
+# start PyVFS thread and import the decorator
+from pyvfs.objectfs import export
 
 
 # export all objects of the Example class

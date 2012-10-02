@@ -7,16 +7,16 @@ objectfs API
     The code documentation is in progress. Right now
     the best documentation is the code itself.
 
-.. automodule:: objectfs.pyfs
-    :members: export, PyFS, vInode, vRepr
+.. automodule:: pyvfs.objectfs
+    :members: export, ObjectFS, vInode, vRepr
 
-.. automodule:: objectfs.vfs
+.. automodule:: pyvfs.vfs
     :members:
 
-.. automodule:: objectfs.utils
+.. automodule:: pyvfs.utils
     :members:
 
-.. automodule:: objectfs.v9fs
+.. automodule:: pyvfs.v9fs
     :members:
 
 

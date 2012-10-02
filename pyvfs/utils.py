@@ -1,11 +1,11 @@
 """
-objectfs.utils -- utility classes
+pyvfs.utils -- utility classes
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Utility classes for VFS
 """
 from collections import deque
-from objectfs.vfs import Inode
+from pyvfs.vfs import Inode
 
 
 class logInode(Inode):

@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 """
-Simple PyFS example
+Simple PyVFS example
 """
 
-# start PyFS thread and import the decorator
-from objectfs.pyfs import export
+# start PyVFS thread and import the decorator
+from pyvfs.objectfs import export
 
 
 # export all objects of the Example class
@@ -14,7 +14,7 @@ class Example(object):
 
     def __init__(self, text):
         """
-        PyFS @export decorator substitutes the constructor
+        PyVFS @export decorator substitutes the constructor
         with wrapped function, that creates weakref.proxy()
         to the object.
         """
@@ -55,7 +55,7 @@ class Child(Example):
         This __repr__() will fail at the time of object's
         export (see above), so it will cause the object's
         tree root to be renamed. To look at this you should
-        export env variable PYFS_LOG=True and cat .../log
+        export env variable PYVFS_LOG=True and cat .../log
         """
         return "%s [0x%x]" % (self.__class__.__name__, self.id)
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
-from objectfs.v9fs import v9fs
-from objectfs.vfs import Storage
+from pyvfs.v9fs import v9fs
+from pyvfs.vfs import Storage
 import py9p
 
 

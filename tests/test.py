@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from objectfs.pyfs import export
+from pyvfs.objectfs import export
 import gc
 
 

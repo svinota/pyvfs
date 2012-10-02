@@ -1,9 +1,9 @@
-objectfs
-========
+pyvfs
+=====
 
 Pre-alfa version of a simple userspace virtual file system implementation.
 
- * Documentation: http://peet.spb.ru/pyfs/
+ * Documentation: http://peet.spb.ru/pyvfs/
  * Installation: make install
  * Requirements: Python >= 2.6, py9p (https://github.com/svinota/py9p)
 
