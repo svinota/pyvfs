@@ -14,7 +14,7 @@ import grp
 import logging
 import threading
 import types
-from StringIO import StringIO
+from io import BytesIO
 
 DEFAULT_DIR_MODE = 0o755
 DEFAULT_FILE_MODE = 0o644
@@ -51,7 +51,7 @@ class ThreadSafe(object):
             return obj
 
 
-class Inode(ThreadSafe, StringIO):
+class Inode(ThreadSafe, BytesIO):
     """
     VFS inode
     """
@@ -64,7 +64,7 @@ class Inode(ThreadSafe, StringIO):
     def __init__(self, name, parent=None, mode=0, storage=None):
 
         ThreadSafe.__init__(self)
-        StringIO.__init__(self)
+        BytesIO.__init__(self)
 
         self.parent = parent or self
         self.storage = storage or parent.storage
@@ -179,7 +179,7 @@ class Inode(ThreadSafe, StringIO):
         if self.mode & stat.S_IFDIR:
             return len(list(self.children.keys()))
         else:
-            return self.len
+            return self.seek(0, 2)
 
 
 class Storage(ThreadSafe):
