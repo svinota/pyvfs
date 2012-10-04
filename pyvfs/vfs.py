@@ -38,6 +38,7 @@ class Inode(BytesIO, object):
 
         self.parent = parent or self
         self.storage = storage or parent.storage
+        self.children = {}
         self.name = name
         self.type = 0
         self.dev = 0
@@ -46,7 +47,6 @@ class Inode(BytesIO, object):
         self.gidnum = os.getgid()
         self.uid = self.muid = pwd.getpwuid(self.uidnum).pw_name
         self.gid = grp.getgrgid(self.gidnum).gr_name
-        self.children = {}
         self.writelock = False
         if mode & stat.S_IFDIR:
             self.mode = stat.S_IFDIR | DEFAULT_DIR_MODE
@@ -58,21 +58,31 @@ class Inode(BytesIO, object):
     def __hash__(self):
         return self.path
 
+    def _update_register(self):
+        try:
+            self._check_special(self.name)
+            self.storage.unregister(self)
+        except:
+            pass
+        self.path = int(abs(hash(self.absolute_path())))
+        self.storage.register(self)
+        for (i,k) in [x for x in list(self.children.items())
+                if x[0] not in (".","..")]:
+            k._update_register()
+
     def _get_name(self):
         return self.__name
 
     def _set_name(self, name):
         self._check_special(name)
         try:
-            self.storage.unregister(self)
             del self.parent.children[self.name]
         except:
             pass
         self.__name = name
-        self.path = int(abs(hash(self.absolute_path())))
-        self.storage.register(self)
         if self.parent != self:
             self.parent.children[name] = self
+        self._update_register()
 
     name = property(_get_name, _set_name)
 
