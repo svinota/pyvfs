@@ -1,4 +1,8 @@
 """
+pyvfs.ffs -- FUSE connector
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The abstraction layer for the FUSE
 """
 import fuse
 import errno
@@ -6,6 +10,9 @@ import stat
 
 
 class fStat(fuse.Stat):
+    """
+    FUSE stat structure, that will represent PyVFS Inode
+    """
     def __init__(self, inode):
         self.st_mode = inode.mode
         self.st_ino = 0
@@ -35,6 +42,7 @@ fuse.fuse_python_api = (0, 2)
 
 class ffs(fuse.Fuse, object):
     """
+    FUSE abstraction layer
     """
 
     def __init__(self, storage, *argv, **kwarg):

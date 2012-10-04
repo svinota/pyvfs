@@ -19,4 +19,5 @@ objectfs API
 .. automodule:: pyvfs.v9fs
     :members:
 
-
+.. automodule:: pyvfs.ffs
+    :members:

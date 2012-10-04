@@ -50,9 +50,54 @@ is extremely simple::
     class MyObject(object):
         ...
 
+The behaviour of the script and how/where you can mount the FS, depends on
+the FS protocol the script uses. By default, ``9p`` is used, but you can
+change it with ``PYVFS_PROTO`` environment variable.
+
+Protocol 9p
++++++++++++
+
+Environment variables to use with 9p:
+
+    * **PYVFS_PROTO** -- should be set to ``9p`` (it is the default)
+    * **PYVFS_ADDRESS** -- IPv4 address to listen on (default: 127.0.0.1)
+    * **PYVFS_PORT** -- TCP port (default: 10001)
+    * **PYVFS_DEBUG** -- switch the debug output [True/False] (default: False)
+    * **PYVFS_LOG** -- create /log file and logging handler (default: False)
+
+Bash script sample::
+
+    #!/bin/bash
+    export PYVFS_PROTO=9p
+    export PYVFS_ADDRESS=0.0.0.0  # allow public access
+    export PYVFS_LOG=True
+    ./my_script.py
+
 To mount your running script, you can use simple mount call::
 
     $ sudo mount -t 9p -o port=10001 127.0.0.1 /mnt/pyvfs
+
+Protocol FUSE
++++++++++++++
+
+Environment variables:
+
+    * **PYVFS_PROTO** -- should be set to ``fuse``
+    * **PYVFS_MOUNTPOINT** -- the mountpoint with r/w access (default: ./mnt)
+    * **PYVFS_DEBUG** -- the same as for ``9p``
+    * **PYVFS_LOG** -- the same as for ``9p``
+
+Bash script sample::
+
+    #!/bin/bash
+    export PYVFS_PROTO=fuse
+    export PYVFS_MOUNTPOINT=/home/erkki/mnt
+    export PYVFS_LOG=True
+    ./my_script.py
+    fusermount -u $PYVFS_MOUNTPOINT
+
+The FS will be mounted with your script startup. Do not forget to umount it
+later with fusermount
 
 Implementation and API
 ----------------------

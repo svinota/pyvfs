@@ -6,28 +6,39 @@ The module should be used to create filesystem that
 represents Python objects as directories and files.
 This allows easy inspection of the objects in runtime
 with any file management tool, e.g. bash.
-By now the module uses 9p2000 filesystem and creates
-it just after the import call. You can mount it on
-your Linux system, or you can use FUSE, or any 9p
-client::
+
+The filesystem will be exported with the protocol
+you will choose. Supported protocols now are ``9p`` and
+``fuse``. For ``9p`` you should have py9p installed,
+for ``fuse``, respectively, fuse-python binding. With
+``9p`` you will be able to mount the FS with mount(8)
+or with any other 9p implementation::
 
     mount -t 9p -o ro,port=10001 127.0.0.1 /mnt/debugfs
 
-By default it listens on tcp 127.0.0.1:10001, but you
-can change the behaviour with environment variables:
+In the case of ``fuse`` protocol, the FS will be mounted
+immediately with the script startup. You can configure
+the behaviour with environment variables:
 
- * PYVFS_PORT -- tcp port; UNIX sockets are not supported
-   by now, but they are planned
- * PYVFS_ADDRESS -- IPv4 address, use 0.0.0.0 to allow
-   remote access
- * PYVFS_DEBUG -- turn on stderr debug output of py9p
- * PYVFS_LOG -- create /log inode
+ * **PYVFS_PROTO** -- ``9p`` (default) or ``fuse``
+ * **PYVFS_PORT** -- tcp port; UNIX sockets are not supported
+   by now, but they are planned (9p only, default: 10001)
+ * **PYVFS_ADDRESS** -- IPv4 address, use 0.0.0.0 to allow
+   public access (9p only, default: 127.0.0.1)
+ * **PYVFS_MOUNTPOINT** -- the mountpoint (fuse only, default: ./mnt)
+ * **PYVFS_DEBUG** -- turn on stderr debug output of the FS protocol
+ * **PYVFS_LOG** -- create /log inode
 
 .. note::
     This module creates a server thread just after the import,
     without any explicit calls. The thread requires no attention
     and stop automatically as the script exits. No cleanup
     procedure is required.
+
+    In the case of ``fuse`` protocol, it also mount the FS
+    immediately with the startup. Later you should umount it
+    with ``fusermount -u`` command. It is **not** umount'ed
+    automatically.
 
 .. warning::
     If you use the system ``mount`` and the kernel implementation
@@ -41,8 +52,9 @@ can change the behaviour with environment variables:
     can happen.
 
 .. warning::
-    No authentication is implemented yet. Do not expose the socket
-    to the public access.
+    No authentication for 9p is used in this library yet.
+    Do not expose the socket to the public access unless you
+    completely understand what are you doing.
 """
 
 import types
