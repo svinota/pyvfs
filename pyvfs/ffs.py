@@ -41,33 +41,21 @@ class ffs(fuse.Fuse, object):
         self.storage = storage
         self.root = self.storage.root
 
-    def open(self, path, size, offset):
-        try:
-            f = self.storage.checkout(hash8(path))
-        except:
-            return -errno.ENOENT
-        f.sync()
-
     def getattr(self, path):
         try:
             f = self.storage.checkout(hash8(path))
+            f.sync()
         except Exception as e:
-            import traceback
-            traceback.print_exc()
             return -errno.ENOENT
-        
         return fStat(f)
 
     def readdir(self, path, offset):
         try:
             f = self.storage.checkout(hash8(path))
             for i in list(f.children.keys()):
-                print "debug: %s" % (i)
                 yield fuse.Direntry(i)
 
         except:
-            import traceback
-            traceback.print_exc()
             yield -errno.ENOENT
 
     def read(self, path, size, offset):
