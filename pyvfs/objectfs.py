@@ -48,14 +48,55 @@ can change the behaviour with environment variables:
 import types
 import stat
 import os
-import py9p
 import weakref
 import logging
 from abc import ABCMeta
 from pyvfs.vfs import Storage, Inode
-from pyvfs.v9fs import v9fs
 from pyvfs.utils import logInode
 from threading import Thread
+
+
+def _start_v9fs():
+    srv = py9p.Server(listen=(_PYVFS_ADDRESS, _PYVFS_PORT),
+            chatty=_PYVFS_DEBUG, dotu=True)
+    srv.mount(v9fs(fs))
+    return srv.serve
+
+
+def _start_fuse():
+    srv = ffs(storage=fs, version="%prog " + fuse.__version__,
+            dash_s_do='setsingle')
+    srv.fuse_args.setmod('foreground')
+    if _PYVFS_DEBUG:
+        srv.fuse_args.add('debug')
+    srv.fuse_args.mountpoint = os.path.realpath(_PYVFS_MOUNTPOINT)
+    # srv.parse(errex=1)
+    return srv.main
+
+
+protocols = {
+        "9p": _start_v9fs,
+        "fuse": _start_fuse,
+        }
+
+
+try:
+    import py9p
+    from pyvfs.v9fs import v9fs
+except:
+    del protocols["9p"]
+
+
+try:
+    import fuse
+    from pyvfs.ffs import ffs
+    fuse.fuse_python_api = (0, 2)
+except:
+    del protocols["fuse"]
+
+
+if len(list(protocols.keys())) == 0:
+    raise Exception("No available protocols found, install py9p or fuse")
 
 
 class Eexist(Exception):
@@ -336,8 +377,10 @@ class ObjectFS(Storage):
 # 8<-----------------------------------------------------------------------
 #
 # configure file server
+_PYVFS_PROTO = os.environ.get("PYVFS_PROTO", "9p")
 _PYVFS_ADDRESS = os.environ.get("PYVFS_ADDRESS", "127.0.0.1")
 _PYVFS_PORT = int(os.environ.get("PYVFS_PORT", "10001"))
+_PYVFS_MOUNTPOINT = os.environ.get("PYVFS_MOUNTPOINT", "./mnt")
 _PYVFS_DEBUG = os.environ.get("PYVFS_DEBUG", "False").lower() in (
     "yes", "true", "t", "1")
 _PYVFS_LOG = os.environ.get("PYVFS_LOG", "False").lower() in (
@@ -357,15 +400,19 @@ if _PYVFS_LOG:
         "%(asctime)s : %(levelname)s : %(message)s")
     handler.setFormatter(formatter)
     logger.addHandler(handler)
-    logger.removeHandler(logger.handlers[0])
+    for i in range(len(logger.handlers) - 1):
+        logger.removeHandler(logger.handlers[0])
     logger.debug("PyVFS started")
 
 # start the server
-srv = py9p.Server(listen=(_PYVFS_ADDRESS, _PYVFS_PORT),
-        chatty=_PYVFS_DEBUG, dotu=True)
-srv.mount(v9fs(fs))
-srv_thread = Thread(target=srv.serve,
-        name="PyVFS for ObjectFS at 0x%x" % (id(fs)))
+try:
+    srv_thread = Thread(target=protocols[_PYVFS_PROTO](),
+            name="PyVFS for ObjectFS at 0x%x" % (id(fs)))
+except KeyError:
+    raise Exception("Requested protocol <%s> is not available" %\
+            (_PYVFS_PROTO))
+except Exception as e:
+    raise e
 srv_thread.setDaemon(True)
 srv_thread.start()
 
