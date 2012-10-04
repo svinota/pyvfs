@@ -154,9 +154,7 @@ class vInode(Inode):
     from the filesystem.
     """
 
-    special_names = [
-            ".",
-            "..",
+    auto_names = [
             ".repr",
             ]
 
@@ -260,7 +258,9 @@ class vInode(Inode):
         if self.mode & stat.S_IFDIR:
             chs = set(self.children.keys())
             obs = set(_dir(self.observe))
-            to_delete = chs - obs - set(self.special_names)
+            to_delete = chs - obs -\
+                    set(self.special_names) -\
+                    set(self.auto_names)
             to_create = obs - chs
             for i in to_delete:
                 self.storage.remove(self.children[i].path)
