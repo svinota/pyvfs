@@ -53,7 +53,7 @@ class Inode(BytesIO, object):
             self.children["."] = self
             self.children[".."] = self.parent
         else:
-            self.mode = DEFAULT_FILE_MODE
+            self.mode = stat.S_IFREG | DEFAULT_FILE_MODE
 
     def __hash__(self):
         return self.path
