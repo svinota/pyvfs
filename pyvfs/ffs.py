@@ -4,6 +4,7 @@ import fuse
 import errno
 import stat
 
+
 class fStat(fuse.Stat):
     def __init__(self, inode):
         self.st_mode = inode.mode
@@ -31,6 +32,7 @@ def hash8(path):
 
 fuse.fuse_python_api = (0, 2)
 
+
 class ffs(fuse.Fuse, object):
     """
     """
@@ -45,7 +47,7 @@ class ffs(fuse.Fuse, object):
         try:
             f = self.storage.checkout(hash8(path))
             f.sync()
-        except Exception as e:
+        except:
             return -errno.ENOENT
         return fStat(f)
 
