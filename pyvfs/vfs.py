@@ -66,8 +66,8 @@ class Inode(BytesIO, object):
             pass
         self.path = int(abs(hash(self.absolute_path())))
         self.storage.register(self)
-        for (i,k) in [x for x in list(self.children.items())
-                if x[0] not in (".","..")]:
+        for (i, k) in [x for x in list(self.children.items())
+                if x[0] not in (".", "..")]:
             k._update_register()
 
     def _get_name(self):
