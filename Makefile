@@ -43,8 +43,10 @@ dist: manifest
 	${python} setup.py sdist
 
 check:
-	pep8 .
-	pyflakes .
+	for i in pyvfs examples tests; \
+		do pep8 $$i || exit 1; \
+		pyflakes $$i || exit 1; \
+		done
 	2to3 pyvfs
 
 build:
