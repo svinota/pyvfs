@@ -42,7 +42,7 @@ class Inode(BytesIO, object):
         self.name = name
         self.type = 0
         self.dev = 0
-        self.atime = self.mtime = int(time.time())
+        self.ctime = self.atime = self.mtime = int(time.time())
         self.uidnum = self.muidnum = os.getuid()
         self.gidnum = os.getgid()
         self.uid = self.muid = pwd.getpwuid(self.uidnum).pw_name
