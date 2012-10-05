@@ -219,51 +219,56 @@ class Storage(object):
         """
         Create an inode
         """
-        self.lock.acquire()
-        new = parent.create(name, mode)
-        self.register(new)
-        self.lock.release()
+        with self.lock:
+            new = parent.create(name, mode)
+            self.register(new)
         return new
 
     def checkout(self, target):
         return self.files[target]
 
+    def reparent(self, target, inode, new_name=None):
+        with self.lock:
+            new_parent = self.checkout(target)
+            lookup = new_name or inode.name
+            if lookup in list(new_parent.children.keys()):
+                raise Eexist()
+            inode.parent.remove(inode)
+            if new_name:
+                inode.name = new_name
+            new_parent.add(inode)
+
     def commit(self, target):
-        self.lock.acquire()
-        f = self.checkout(target)
-        if f.writelock:
-            f.writelock = False
-            f.commit()
-        self.lock.release()
+        with self.lock:
+            f = self.checkout(target)
+            if f.writelock:
+                f.writelock = False
+                f.commit()
 
     def write(self, target, data, offset=0):
-        self.lock.acquire()
-        f = self.checkout(target)
-        f.writelock = True
-        f.seek(offset, os.SEEK_SET)
-        f.write(data)
-        self.lock.release()
+        with self.lock:
+            f = self.checkout(target)
+            f.writelock = True
+            f.seek(offset, os.SEEK_SET)
+            f.write(data)
         return len(data)
 
     def read(self, target, size, offset=0):
-        self.lock.acquire()
-        f = self.checkout(target)
-        if offset == 0:
-            f.sync()
-        f.seek(offset, os.SEEK_SET)
-        data = f.read(size)
-        self.lock.release()
+        with self.lock:
+            f = self.checkout(target)
+            if offset == 0:
+                f.sync()
+            f.seek(offset, os.SEEK_SET)
+            data = f.read(size)
         return data
 
     def remove(self, target):
-        self.lock.acquire()
-        f = self.checkout(target)
-        f.parent.remove(f)
-        self.unregister(f)
-        self.lock.release()
+        with self.lock:
+            f = self.checkout(target)
+            f.parent.remove(f)
+            self.unregister(f)
 
     def wstat(self, target, stat):
-        self.lock.acquire()
-        f = self.checkout(target)
-        f.wstat(stat)
-        self.lock.release()
+        with self.lock:
+            f = self.checkout(target)
+            f.wstat(stat)
