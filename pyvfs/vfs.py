@@ -22,6 +22,14 @@ class Eperm(Exception):
     pass
 
 
+class Eexist(Exception):
+    pass
+
+
+class Edebug(Exception):
+    pass
+
+
 class Inode(BytesIO, object):
     """
     VFS inode
@@ -59,6 +67,8 @@ class Inode(BytesIO, object):
         return self.path
 
     def _update_register(self):
+        if self.orphaned:
+            return
         try:
             self._check_special(self.name)
             self.storage.unregister(self)
@@ -76,11 +86,15 @@ class Inode(BytesIO, object):
     def _set_name(self, name):
         self._check_special(name)
         try:
+            if name in list(self.parent.children.keys()):
+                raise Eexist()
             del self.parent.children[self.name]
+        except Eexist as e:
+            raise e
         except:
             pass
         self.__name = name
-        if self.parent != self:
+        if (self.parent != self) and (self.parent != None):
             self.parent.children[name] = self
         self._update_register()
 
@@ -90,6 +104,14 @@ class Inode(BytesIO, object):
         for i in args:
             if i in self.special_names:
                 raise Eperm()
+
+    @property
+    def orphaned(self):
+        if self.parent == self:
+            return False
+        if self.parent is None:
+            return True
+        return self.parent.orphaned
 
     def absolute_path(self, stop=None):
         if (self.parent is not None) and\
@@ -105,12 +127,21 @@ class Inode(BytesIO, object):
     def sync(self):
         pass
 
-    def remove(self, child):
+    def add(self, inode):
+        if inode.name in list(self.children.keys()):
+            raise Eexist()
+        self.children[inode.name] = inode
+        inode.parent = self
+        inode.storage = self.storage
+        inode._update_register()
+
+    def remove(self, inode):
         """
         Remove a child from a directory
         """
-        self._check_special(child.name)
-        del self.children[child.name]
+        self._check_special(inode.name)
+        inode.parent = None
+        del self.children[inode.name]
 
     def create(self, name, mode=0, **kwarg):
         """
