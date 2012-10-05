@@ -34,6 +34,22 @@ def hash8(path):
         return 0
     return int(abs(hash(path)))
 
+
+def getParts(path):
+    fname = path.split("/")[-1]
+    parent = path[:-(len(fname) + 1)] or "/"
+    return (fname, parent)
+
+
+def checkout(c):
+    def wrapped(self, path, *argv):
+        try:
+            inode = self.storage.checkout(hash8(path))
+        except:
+            return -errno.ENOENT
+        return c(self, inode, *argv)
+    return wrapped
+
 # 8<-----------------------------------------------------------------------
 #
 
@@ -51,13 +67,81 @@ class ffs(fuse.Fuse, object):
         self.storage = storage
         self.root = self.storage.root
 
-    def getattr(self, path):
+    def mknod(self, path, mode, dev):
+        # work only with regular files
+        if dev:
+            return -errno.ENOSYS
+        # if it is not a file, it should be a dir
+        if not mode & stat.S_IFREG:
+            mode |= stat.S_IFDIR
+        fname, parent = getParts(path)
+        f = self.storage.checkout(hash8(parent))
+        self.storage.create(fname, f, mode)
+
+    def mkdir(self, path, mode):
+        return self.mknod(path, mode, None)
+
+    @checkout
+    def flush(self, inode):
+        self.storage.commit(inode.path)
+
+    @checkout
+    def chmod(self, inode, mode):
+        inode.mode = mode | (inode.mode & \
+                (stat.S_IFREG | stat.S_IFDIR))
+
+    @checkout
+    def chown(self, inode, uid, gid):
+        if uid > -1:
+            inode.uidnum = uid
+        if gid > -1:
+            inode.gidnum = gid
+
+    @checkout
+    def getattr(self, inode):
+        inode.sync()
+        return fStat(inode)
+
+    @checkout
+    def read(self, inode, size, offset):
+        if offset == 0:
+            inode.sync()
+        return self.storage.read(inode.path, size, offset)
+
+    @checkout
+    def write(self, inode, buf, offset):
+        inode.seek(offset)
+        inode.write(buf)
+        return len(buf)
+
+    @checkout
+    def truncate(self, inode, size):
+        inode.seek(size)
+        inode.truncate()
+
+    @checkout
+    def utime(self, inode, times):
+        inode.atime = times[0]
+        inode.mtime = times[1]
+
+    @checkout
+    def unlink(self, inode):
         try:
-            f = self.storage.checkout(hash8(path))
-            f.sync()
+            self.storage.remove(inode.path)
         except:
-            return -errno.ENOENT
-        return fStat(f)
+            return -errno.EPERM
+
+    @checkout
+    def rmdir(self, inode):
+        return self.unlink(inode.absolute_path())
+
+    @checkout
+    def rename(self, inode, path):
+        fname, parent = getParts(path)
+        try:
+            self.storage.reparent(hash8(parent), inode, fname)
+        except:
+            return -errno.EEXIST
 
     def readdir(self, path, offset):
         try:
@@ -67,14 +151,3 @@ class ffs(fuse.Fuse, object):
 
         except:
             yield -errno.ENOENT
-
-    def read(self, path, size, offset):
-        try:
-            f = self.storage.checkout(hash8(path))
-        except:
-            return -errno.ENOENT
-
-        if offset == 0:
-            f.sync()
-
-        return self.storage.read(f.path, size, offset)
