@@ -58,10 +58,11 @@ class indexInode(Inode):
     def sync(self):
         self.seek(0)
         self.truncate()
-        self.write("%-20s   %-8s   %s\n\n" % (
+        self.write("# storage file index debug\n")
+        self.write("%-20s : %-8s : %s\n\n" % (
             "hash8", "mode", "name"))
         for (i, k) in list(self.storage.files.items()):
-            self.write("%-20s : %-8s : %s\n" % (
+            self.write("%-20s : %-8s : \"%s\"\n" % (
                 i, oct(k.mode), k.absolute_path()))
 
 
