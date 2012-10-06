@@ -384,10 +384,12 @@ def export(*argv, **kwarg):
           want to hide the child "dala" of attribute "bala", you should
           use ``"/bala/dala"``.
         * **wekref** -- Use weak references to this object (default: True)
-        * **basedir** -- Not implemented yet.
+        * **basedir** -- The base directory, where to put objects. If it
+          doesn't exist, it will be created.
     """
     blacklist = kwarg.get("blacklist", [])
     weakref = kwarg.get("weakref", True)
+    basedir = kwarg.get("basedir", "").split("/")
 
     def wrap(c):
         old_init = c.__init__
@@ -395,7 +397,14 @@ def export(*argv, **kwarg):
         def new_init(self, *argv, **kwarg):
             global fs
             old_init(self, *argv, **kwarg)
-            fs.create(self, root=True,
+            parent = fs.root
+            for i in basedir:
+                if i != "":
+                    try:
+                        parent = parent.children[i]
+                    except:
+                        parent = vInode(i, parent, mode=stat.S_IFDIR)
+            fs.create(self, root=True, parent=parent,
                     blacklist=blacklist, weakref=weakref)
         c.__init__ = new_init
         return c
