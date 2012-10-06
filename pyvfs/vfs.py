@@ -12,6 +12,7 @@ import time
 import pwd
 import grp
 import threading
+import logging
 from io import BytesIO
 
 DEFAULT_DIR_MODE = 0o755
@@ -158,6 +159,7 @@ class Inode(BytesIO, object):
         Rename a child
         """
         # just a legacy interface
+        logging.debug("deprecated call Inode.rename() used")
         self.children[old_name].name = new_name
 
     def wstat(self, stat):
