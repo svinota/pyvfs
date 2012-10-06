@@ -145,8 +145,11 @@ class vRepr(Inode):
     def sync(self):
         self.seek(0)
         self.truncate()
-        if self.parent.observe is not None:
-            self.write(bytes(self.parent.observe.__repr__()))
+        try:
+            if self.parent.observe is not None:
+                self.write(bytes(self.parent.observe.__repr__()))
+        except:
+            pass
 
 
 class vInode(Inode):
@@ -265,21 +268,26 @@ class vInode(Inode):
 
         if self.mode & stat.S_IFDIR:
             chs = set(self.children.keys())
-            obs = set(_dir(self.observe))
+            try:
+                obs = set(_dir(self.observe))
+            except:
+                obs = set()
             to_delete = chs - obs -\
                     set(self.special_names) -\
                     set(self.auto_names)
             to_create = obs - chs
             for i in to_delete:
                 self.storage.remove(self.children[i].path)
-            # consider for saving stack in the root object inode!
             for i in to_create:
                 self.storage.create(_getattr(self.observe, i),
                         parent=self, name=i)
         else:
             self.seek(0)
             self.truncate()
-            self.write(str(_getattr(self.parent.observe, self.name)))
+            try:
+                self.write(str(_getattr(self.parent.observe, self.name)))
+            except:
+                pass
 
 
 class ObjectFS(Storage):
