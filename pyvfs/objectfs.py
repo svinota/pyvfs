@@ -203,7 +203,10 @@ class vInode(Inode):
         if self.root:
             return self.__observe
         else:
-            return _getattr(self.parent.observe, self.name)
+            try:
+                return _getattr(self.parent.observe, self.name)
+            except:
+                return None
 
     def _set_observe(self, obj):
 
