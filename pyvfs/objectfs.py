@@ -170,7 +170,7 @@ class vInode(Inode):
             ]
 
     def __init__(self, name, parent=None, mode=0, storage=None,
-            obj=None, root=None, blacklist=None):
+            obj=None, root=None, blacklist=None, weakref=True):
         Inode.__init__(self, name, parent, mode, storage)
         if hasattr(self.parent, "stack"):
             self.stack = self.parent.stack
@@ -184,6 +184,7 @@ class vInode(Inode):
                 self.storage.remove(self.path)
                 raise Eperm()
         # force self.observe, bypass property setter
+        self.use_weakrefs = weakref
         self.__observe = None
         self.observe = obj
         # repr hack
@@ -388,9 +389,11 @@ def export(*argv, **kwarg):
           ``"/bala"`` in your blacklist. The same is for children, if you
           want to hide the child "dala" of attribute "bala", you should
           use ``"/bala/dala"``.
+        * **wekref** -- Use weak references to this object (default: True)
         * **basedir** -- Not implemented yet.
     """
     blacklist = kwarg.get("blacklist", [])
+    weakref = kwarg.get("weakref", True)
 
     def wrap(c):
         old_init = c.__init__
@@ -398,7 +401,8 @@ def export(*argv, **kwarg):
         def new_init(self, *argv, **kwarg):
             global fs
             old_init(self, *argv, **kwarg)
-            fs.create(self, root=True, blacklist=blacklist)
+            fs.create(self, root=True,
+                    blacklist=blacklist, weakref=weakref)
         c.__init__ = new_init
         return c
 
