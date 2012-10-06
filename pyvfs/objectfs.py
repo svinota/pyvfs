@@ -59,19 +59,10 @@ the behaviour with environment variables:
 
 import types
 import stat
-import os
 import weakref
 from abc import ABCMeta
-from pyvfs.vfs import Storage, Inode
+from pyvfs.vfs import Storage, Inode, Eexist, Eperm
 from pyvfs.utils import Server
-
-
-class Eexist(Exception):
-    pass
-
-
-class Eperm(Exception):
-    pass
 
 
 Skip = ABCMeta("Skip", (object,), {})
