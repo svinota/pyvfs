@@ -55,6 +55,10 @@ class logInode(Inode):
 
 
 class indexInode(Inode):
+    """
+    An inode that lists full storage file index.
+    Can be used for debugging purposes.
+    """
     def sync(self):
         self.seek(0)
         self.truncate()
@@ -67,6 +71,47 @@ class indexInode(Inode):
 
 
 class Server(threading.Thread):
+    """
+    The main interface to create and start a filesystem.
+
+    The filesystem will be exported with the protocol
+    you will choose. Supported protocols now are ``9p`` and
+    ``fuse``. For ``9p`` you should have py9p installed,
+    for ``fuse``, respectively, fuse-python binding. With
+    ``9p`` you will be able to mount the FS with mount(8)
+    or with any other 9p implementation::
+
+        mount -t 9p -o ro,port=10001 127.0.0.1 /mnt/debugfs
+
+    In the case of ``fuse`` protocol, the FS will be mounted
+    immediately with the script startup. You can configure
+    the behaviour with environment variables:
+
+     * **PYVFS_PROTO** -- ``9p`` (default) or ``fuse``
+     * **PYVFS_PORT** -- tcp port; UNIX sockets are not supported
+       by now, but they are planned (9p only, default: 10001)
+     * **PYVFS_ADDRESS** -- IPv4 address, use 0.0.0.0 to allow
+       public access (9p only, default: 127.0.0.1)
+     * **PYVFS_MOUNTPOINT** -- the mountpoint (fuse only, default: ./mnt)
+     * **PYVFS_DEBUG** -- turn on stderr debug output of the FS protocol
+     * **PYVFS_LOG** -- create /log inode
+
+    .. warning::
+        No authentication for 9p is used in this library yet.
+        Do not expose the socket to the public access unless you
+        completely understand what are you doing.
+
+    The typical code should look like that::
+
+        from pyvfs.vfs import Storage
+        from pyvfs.utils import Server
+
+        server = Server(Storage())
+        server.start()
+
+    To run server in the backgroung, use ``start()``, in the
+    foreground -- ``run()`` method.
+    """
     parser = {
             "proto": "9p",
             "address": "127.0.0.1",

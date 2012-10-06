@@ -27,29 +27,6 @@ you can write your own file implemenations on the base of ``pyvfs.vfs``.
 E.g., you can parse and utilize the file contents on ``write()``,
 create simple data channels and FS-based RPC interfaces.
 
-ObjectFS
-~~~~~~~~
-
-.. toctree::
-    :maxdepth: 2
-
-    first_steps
-    second_steps
-
-With ``pyvfs.objectfs`` you can *mount* your Python script (sic)
-and browse exported objects as directories and files. The usage
-is extremely simple::
-
-    # just import module and decorator
-    from pyvfs.objectfs import export
-
-    ...
-
-    # then decorate objects you want to browse
-    @export
-    class MyObject(object):
-        ...
-
 The behaviour of the script and how/where you can mount the FS, depends on
 the FS protocol the script uses. By default, ``9p`` is used, but you can
 change it with ``PYVFS_PROTO`` environment variable.
@@ -80,6 +57,10 @@ To mount your running script, you can use simple mount call::
 Protocol FUSE
 +++++++++++++
 
+.. note::
+    Python FUSE binding uses not Python threading, so, it can not
+    be traced with debugger, e.g. rpdb2, in the same way as py9p.
+
 Environment variables:
 
     * **PYVFS_PROTO** -- should be set to ``fuse``
@@ -97,7 +78,46 @@ Bash script sample::
     fusermount -u $PYVFS_MOUNTPOINT
 
 The FS will be mounted with your script startup. Do not forget to umount it
-later with fusermount
+later with fusermount.
+
+ObjectFS
+~~~~~~~~
+
+.. toctree::
+    :maxdepth: 2
+
+    first_steps
+    second_steps
+
+With ``pyvfs.objectfs`` you can *mount* your Python script (sic)
+and browse exported objects as directories and files. The usage
+is extremely simple::
+
+    # just import module and decorator
+    from pyvfs.objectfs import export
+
+    ...
+
+    # then decorate objects you want to browse
+    @export
+    class MyObject(object):
+        ...
+
+By default, objectfs creates weak references to your objects.
+It allows proper garbage collection, the object will not stay
+alive only 'cause of one reference from the objectfs.
+
+But this scheme works unpredictably when you use ``fuse``
+protocol to access objectfs: some weakrefs can not be dereferenced
+with «object no longer exist» exception, though the object is
+still alive. This causes objects disappear from FS.
+
+.. note::
+    Consider usage of 9p protocol together with objectfs,
+    or be ready to miss some objectfs on FS.
+
+Also you can use ``weakref=False`` decorator argument, but it will
+prevent objects to be GC'ed.
 
 Implementation and API
 ----------------------
