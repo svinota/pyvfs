@@ -265,6 +265,9 @@ class Storage(object):
     def remove(self, target):
         with self.lock:
             f = self.checkout(target)
+            for i, k in list(f.children.items()):
+                if i not in f.special_names:
+                    self.remove(k.path)
             f.parent.remove(f)
             self.unregister(f)
 
