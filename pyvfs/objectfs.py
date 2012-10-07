@@ -32,6 +32,7 @@ import types
 import stat
 import os
 import weakref
+import logging
 from abc import ABCMeta
 from pyvfs.vfs import Storage, Inode, Eexist, Eperm
 from pyvfs.utils import Server
@@ -226,10 +227,14 @@ class vInode(Inode):
 
     observe = property(_get_observe, _set_observe)
 
-    def register(self, obj):
-        self.observe = obj
-
     def commit(self):
+        """
+        Write data back from the I/O buffer to the corresponding
+        attribute. Please note, that the data will be written
+        with the type the attribute had before. If the type can
+        not be casted from the data, commit will silently fail
+        and the attribute will be unchanged.
+        """
         if (self.mode & stat.S_IFREG) and \
             self.name != ".repr":
             try:
@@ -240,10 +245,19 @@ class vInode(Inode):
                 else:
                     _setattr(self.parent.observe, self.name,
                         type(self.observe)(self.getvalue()))
-            except:
-                pass
+            except Exception as e:
+                logging.debug("[%s] commit() failed: %s" % (
+                    self.path, str(e)))
 
     def sync(self):
+        """
+        Synchronize directory subtree with the object's state.
+
+        * Remove directories of GC'ed objects
+        * Add inodes for new object's attributes (dirs)
+        * Remove inodes of not existing attributes (dirs)
+        * Write data from an attribute to the I/O buffer (file)
+        """
         if self.observe is None:
             for (i, k) in list(self.children.items()):
                 try:
