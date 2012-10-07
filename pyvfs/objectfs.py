@@ -66,6 +66,15 @@ File.register(str)
 File.register(type(None))
 
 
+def _setattr(obj, item, value):
+    if isinstance(obj, list):
+        obj[int(item)] = value
+    elif isinstance(obj, dict):
+        obj[item] = value
+    else:
+        setattr(obj, item, value)
+
+
 def _getattr(obj, item):
     if isinstance(obj, List):
         return obj[int(item)]
@@ -219,6 +228,20 @@ class vInode(Inode):
 
     def register(self, obj):
         self.observe = obj
+
+    def commit(self):
+        if (self.mode & stat.S_IFREG) and \
+            self.name != ".repr":
+            try:
+                if isinstance(self.observe, bool):
+                    _setattr(self.parent.observe, self.name,
+                            self.getvalue().lower() in (
+                            "yes", "true", "on", "t", "1"))
+                else:
+                    _setattr(self.parent.observe, self.name,
+                        type(self.observe)(self.getvalue()))
+            except:
+                pass
 
     def sync(self):
         if self.observe is None:
