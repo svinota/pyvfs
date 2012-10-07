@@ -3,7 +3,7 @@
 
 # You can set these variables from the command line.
 SPHINXOPTS    =
-SPHINXBUILD   = sphinx-build
+SPHINXBUILD   = OBJECTFS_AUTOSTART=False sphinx-build
 PAPER         =
 BUILDDIR      = _build
 

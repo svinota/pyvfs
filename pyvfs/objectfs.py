@@ -9,14 +9,16 @@ with any file management tool, e.g. bash.
 
 .. note::
     This module creates a server thread just after the import,
-    without any explicit calls. The thread requires no attention
-    and stop automatically as the script exits. No cleanup
-    procedure is required.
+    without any explicit calls.
 
-    In the case of ``fuse`` protocol, it also mount the FS
-    immediately with the startup. Later you should umount it
-    with ``fusermount -u`` command. It is **not** umount'ed
-    automatically.
+To disable objectfs autostart, use environment variable
+``OBJECTFS_AUTOSTART=False``. In this case you can start it
+later with ``pyvfs.objectfs.srv.start()``.
+The started thread requires no attention and stops automatically
+as the script exits. In the case of ``fuse`` protocol, it also
+mounts the FS immediately with the startup. Later you should
+umount it with ``fusermount -u`` command. It is **not** umount'ed
+automatically (yet).
 
 .. warning::
     If you use the system ``mount`` and the kernel implementation
@@ -24,14 +26,11 @@ with any file management tool, e.g. bash.
     the cases of kernel crash were reported. System kernel,
     I mean.
 
-.. note::
-    Mount your script only in read-only mode, since read-write
-    access is not tested yet and nobody knows what the hell
-    can happen.
 """
 
 import types
 import stat
+import os
 import weakref
 from abc import ABCMeta
 from pyvfs.vfs import Storage, Inode, Eexist, Eperm
@@ -322,7 +321,10 @@ class ObjectFS(Storage):
 # create FS
 fs = ObjectFS(vInode, root=True)
 srv = Server(fs)
-srv.start()
+# do not start FS automatically if OBJECTFS_AUTOSTART is set to False
+if os.environ.get("OBJECTFS_AUTOSTART", "True").lower() in (
+        "yes", "true", "on", "t", "1"):
+    srv.start()
 
 
 def export(*argv, **kwarg):
@@ -356,7 +358,7 @@ def export(*argv, **kwarg):
           ``"/bala"`` in your blacklist. The same is for children, if you
           want to hide the child "dala" of attribute "bala", you should
           use ``"/bala/dala"``.
-        * **wekref** -- Use weak references to this object (default: True)
+        * **weakref** -- Use weak references to this object (default: True)
         * **basedir** -- The base directory, where to put objects. If it
           doesn't exist, it will be created.
     """
@@ -388,4 +390,4 @@ def export(*argv, **kwarg):
         return wrap
 
 # make the module safe for import
-__all__ = ["export"]
+__all__ = ["export", "srv"]
