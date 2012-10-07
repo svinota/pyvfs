@@ -110,9 +110,7 @@ class ffs(fuse.Fuse, object):
 
     @checkout
     def write(self, inode, buf, offset):
-        inode.seek(offset)
-        inode.write(buf)
-        return len(buf)
+        return self.storage.write(inode.path, buf, offset)
 
     @checkout
     def truncate(self, inode, size):
