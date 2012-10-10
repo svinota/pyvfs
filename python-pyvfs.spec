@@ -1,14 +1,14 @@
-Name: python-module-pyvfs
+Name: python-pyvfs
 Version: 0.2.3
-Release: alt1
+Release: 1%{?dist}
 Summary: Simple python VFS library
-License: GPL
+License: GPLv3+
 Group: Development/Python
 URL: https://github.com/svinota/pyvfs
 
 BuildArch: noarch
-BuildPreReq: python-devel rpm-build-python
-Source: %name-%version.tar
+BuildRequires: python-devel
+Source: http://peet.spb.ru/archives/pyvfs-%version.tar.gz
 
 %description
 PyVFS is a simple VFS library written in Python. It consists of
@@ -21,31 +21,15 @@ bundled applications, e.g. pyvfs.objectfs -- the library, that allows
 to represent Python objects as files.
 
 %prep
-%setup
+%setup -q -n pyvfs-%{version}
 
 %install
-%makeinstall python=%{__python} root=%buildroot lib=%{python_sitelibdir}
+%{__python} setup.py install --root $RPM_BUILD_ROOT
 
 %files
-
-%{python_sitelibdir}/pyvfs*
+%{python_sitelib}/pyvfs*
 
 %changelog
-* Sat Oct 11 2012 Peter V. Saveliev <peet@altlinux.org> 0.2.3-alt1
-- functions as files (containing disassembled code)
-- writeable attribute files
-- pyvfs.objectfs: disable autostart with OBJECTFS_AUTOSTART
-- pyvfs.objectfs: new argument "functions" for the decorator
-- pyvfs.objectfs: new argument "basedir" for the decorator
+* Thu Oct 11 2012 Peter V. Saveliev <peet@redhat.com> 0.2.3-1
+- initial RH build
 
-* Sat Oct  6 2012 Peter V. Saveliev <peet@altlinux.org> 0.2.2-alt1
-- Read-write FUSE support
-- pyvfs.utils.Server as a dedicated user interface to start FS
-- pyvfs.objectfs: new argument "weakref" for the decorator
-- pyvfs.objectfs: new argument "basedir" for the decorator
-
-* Thu Oct  4 2012 Peter V. Saveliev <peet@altlinux.org> 0.2.1-alt1
-- FUSE support
-
-* Tue Oct  2 2012 Peter V. Saveliev <peet@altlinux.org> 0.1.1-alt1
-- initial build
