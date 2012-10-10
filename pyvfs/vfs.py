@@ -35,6 +35,7 @@ class Inode(BytesIO, object):
     """
     VFS inode
     """
+    mode = 0
     # static member for special names
     special_names = [
             ".",

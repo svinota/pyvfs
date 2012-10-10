@@ -31,8 +31,12 @@ automatically (yet).
 import types
 import stat
 import os
+import sys
+import dis
 import weakref
 import logging
+import traceback
+import inspect
 from abc import ABCMeta
 from pyvfs.vfs import Storage, Inode, Eexist, Eperm
 from pyvfs.utils import Server
@@ -41,12 +45,14 @@ from pyvfs.utils import Server
 Skip = ABCMeta("Skip", (object,), {})
 Skip.register(types.BuiltinFunctionType)
 Skip.register(types.BuiltinMethodType)
-Skip.register(types.MethodType)
 Skip.register(type)
-Skip.register(types.FunctionType)
 Skip.register(types.GeneratorType)
 Skip.register(types.ModuleType)
-Skip.register(types.UnboundMethodType)
+
+
+Func = ABCMeta("Func", (object,), {})
+Func.register(types.FunctionType)
+Func.register(types.UnboundMethodType)
 
 
 List = ABCMeta("List", (object,), {})
@@ -68,6 +74,11 @@ File.register(type(None))
 
 
 def _setattr(obj, item, value):
+    """
+    Set attribute by name. If the parent is a list(), the
+    name is the index in the list. If the parent is a dict(),
+    the name is the key.
+    """
     if isinstance(obj, list):
         obj[int(item)] = value
     elif isinstance(obj, dict):
@@ -77,22 +88,35 @@ def _setattr(obj, item, value):
 
 
 def _getattr(obj, item):
+    """
+    Get attribute by name. The same as for _setattr()
+    """
     if isinstance(obj, List):
         return obj[int(item)]
-    if isinstance(obj, dict):
+    elif isinstance(obj, dict):
         return obj[item]
-    return getattr(obj, item)
+    else:
+        return getattr(obj, item)
 
 
 def _dir(obj):
+    """
+    * For list(): return indices as strings
+    * For dict(): return only string keys
+    * For other objects: return public attributes
+    """
     if isinstance(obj, List):
         return [str(x) for x in range(len(obj))]
-    if isinstance(obj, dict):
+    elif isinstance(obj, dict):
         return [x for x in list(obj.keys()) if isinstance(x, bytes)]
-    return [x for x in dir(obj) if not x.startswith("_")]
+    else:
+        return [x for x in dir(obj) if not x.startswith("_")]
 
 
 def _get_name(obj):
+    """
+    Get automatic name for an object.
+    """
     text = obj.__repr__()
     if text.find("/") == -1:
         return text
@@ -143,7 +167,13 @@ class vInode(Inode):
             ]
 
     def __init__(self, name, parent=None, mode=0, storage=None,
-            obj=None, root=None, blacklist=None, weakref=True):
+            obj=None, root=None, blacklist=None, weakref=True,
+            functions=False):
+
+        # respect preset mode
+        if not (mode | self.mode):
+            self.mode = stat.S_IFDIR
+
         Inode.__init__(self, name, parent, mode, storage)
         if hasattr(self.parent, "stack"):
             self.stack = self.parent.stack
@@ -160,6 +190,7 @@ class vInode(Inode):
         self.use_weakrefs = weakref
         self.__observe = None
         self.observe = obj
+        self.functions = functions
         # repr hack
         if self.mode & stat.S_IFDIR:
             self.children[".repr"] = vRepr(".repr", self)
@@ -268,9 +299,7 @@ class vInode(Inode):
                                 k.name = _get_name(k.observe)
                 except:
                     self.storage.remove(k.path)
-            return
-
-        if self.mode & stat.S_IFDIR:
+        else:
             chs = set(self.children.keys())
             try:
                 obs = set(_dir(self.observe))
@@ -284,14 +313,77 @@ class vInode(Inode):
                 self.storage.remove(self.children[i].path)
             for i in to_create:
                 self.storage.create(_getattr(self.observe, i),
-                        parent=self, name=i)
-        else:
-            self.seek(0)
-            self.truncate()
-            try:
-                self.write(str(_getattr(self.parent.observe, self.name)))
-            except:
-                pass
+                        parent=self, name=i, functions=self.functions)
+
+
+class vFunction(vInode):
+    """
+    The file that represents function as a disassembled code.
+    The fisrt line in the file is the function signature.
+
+    Read/only.
+    """
+    mode = stat.S_IFREG
+
+    def sync(self):
+        self.seek(0)
+        self.truncate()
+        # write function signature
+        sig = []
+        sig_i = inspect.getargspec(self.observe)
+        # get start index for arguments with default values
+        try:
+            def_start = len(sig_i.args) - len(sig_i.defaults)
+        except:
+            def_start = len(sig_i.args)
+        for i in range(len(sig_i.args)):
+            if i >= def_start:
+                # get argument with default value
+                value = sig_i.defaults[i - def_start]
+                if isinstance(value, bytes):
+                    value = "\"%s\"" % (value)
+                sig.append("%s=%s" % (sig_i.args[i], value))
+            else:
+                # get argument w/o default value
+                sig.append("%s" % (sig_i.args[i]))
+        # add positional arguments list (if exists)
+        if sig_i.varargs:
+            sig.append("*%s" % (sig_i.varargs))
+        # add keyword arguments dict (if exists)
+        if sig_i.keywords:
+            sig.append("**%s" % (sig_i.keywords))
+        # format the signature
+        self.write("#  %s(%s)\n\n" % (self.name, ", ".join(sig)))
+        # write function code
+        stdout = sys.stdout
+        stderr = sys.stderr
+        try:
+            sys.stdout = sys.stderr = self
+            dis.dis(self.observe)
+        except:
+            traceback.print_exc()
+        sys.stdout = stdout
+        sys.stderr = stderr
+
+
+class vLiteral(vInode):
+    """
+    The file for string, numbers etc. simple variables.
+
+    Read/write.
+
+    Please note, that the data type on write will be cast
+    from the previous data type.
+    """
+    mode = stat.S_IFREG
+
+    def sync(self):
+        self.seek(0)
+        self.truncate()
+        try:
+            self.write(str(self.observe))
+        except:
+            pass
 
 
 class ObjectFS(Storage):
@@ -331,25 +423,27 @@ class ObjectFS(Storage):
                 # changed later automatically
                 name = str(id(obj))
 
-        if isinstance(obj, Skip):
+        if isinstance(obj, Skip) or \
+                (isinstance(obj, Func) and not kwarg.get("functions", False)):
             return
 
         if name.startswith("_"):
             return
 
-        if isinstance(obj, File):
-            try:
-                new = parent.create(name)
-            except:
-                return
-        else:
-            try:
+        try:
+            if isinstance(obj, Func) and kwarg.get("functions", False):
+                new = vFunction(name, parent)
+                parent.add(new)
+            elif isinstance(obj, File):
+                new = vLiteral(name, parent)
+                parent.add(new)
+            else:
                 new = parent.create(name, mode=stat.S_IFDIR, obj=obj,
                         **kwarg)
                 for item in _dir(obj):
                     self.create(_getattr(obj, item), new, item)
-            except:
-                return
+        except:
+            return
 
         return new
 
@@ -389,19 +483,23 @@ def export(*argv, **kwarg):
             ...
 
     Right now supported parameters are:
+        * **basedir** -- The base directory, where to put objects. If it
+          doesn't exist, it will be created.
         * **blacklist** -- The list of paths from the **object tree root**,
           that should not be exported. For example, if your object has an
           attribute "bala" and you want to hide it, you should use
           ``"/bala"`` in your blacklist. The same is for children, if you
           want to hide the child "dala" of attribute "bala", you should
           use ``"/bala/dala"``.
+        * **functions** -- Create files for functions and methods (default:
+          False). When True, the files will contain disassembled function
+          code.
         * **weakref** -- Use weak references to this object (default: True)
-        * **basedir** -- The base directory, where to put objects. If it
-          doesn't exist, it will be created.
     """
-    blacklist = kwarg.get("blacklist", [])
-    weakref = kwarg.get("weakref", True)
     basedir = kwarg.get("basedir", "").split("/")
+    blacklist = kwarg.get("blacklist", [])
+    functions = kwarg.get("functions", False)
+    weakref = kwarg.get("weakref", True)
 
     def wrap(c):
         old_init = c.__init__
@@ -417,7 +515,7 @@ def export(*argv, **kwarg):
                     except:
                         parent = vInode(i, parent, mode=stat.S_IFDIR)
             fs.create(self, root=True, parent=parent,
-                    blacklist=blacklist, weakref=weakref)
+                    blacklist=blacklist, functions=functions, weakref=weakref)
         c.__init__ = new_init
         return c
 
