@@ -39,12 +39,6 @@ clean:
 	find . -name "*pyc" -exec rm -f "{}" \;
 	make -C docs clean
 
-manifest: clean update-version
-	find pyvfs -name '*.py' >MANIFEST
-
-dist: manifest
-	${python} setup.py sdist
-
 check:
 	for i in pyvfs examples tests; \
 		do pep8 $$i || exit 1; \
@@ -52,27 +46,18 @@ check:
 		done
 	2to3 pyvfs
 
-build:
-	:
-
 setup.py docs/conf.py:
 	gawk -v version=${version} -v release=${release} -v flavor=${flavor}\
 		-f configure.gawk $@.in >$@
 
 update-version: setup.py docs/conf.py
 
-package-alt package-rh: update-version
-	mv setup.py setup.py.1
-	mv docs/conf.py docs/conf.py.1
-	git checkout $@
-	mv -f setup.py.1 setup.py
-	mv -f docs/conf.py.1 docs/conf.py
-	git add setup.py docs/conf.py
-	git commit -m "version update"
-	git checkout master
-
-docs: update-version
+docs: clean update-version
 	make -C docs html
 
-install: manifest
+dist: clean update-version
+	${python} setup.py sdist
+
+install: clean update-version
 	${python} setup.py install ${root} ${lib}
+
