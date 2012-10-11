@@ -2,7 +2,7 @@ Name: python-module-pyvfs
 Version: 0.2.3
 Release: alt1
 Summary: Simple python VFS library
-License: GPL
+License: GPLv3+
 Group: Development/Python
 URL: https://github.com/svinota/pyvfs
 
