@@ -61,6 +61,16 @@ setup.py docs/conf.py:
 
 update-version: setup.py docs/conf.py
 
+package-alt package-rh: update-version
+	mv setup.py setup.py.1
+	mv docs/conf.py docs/conf.py.1
+	git checkout $@
+	mv -f setup.py.1 setup.py
+	mv -f docs/conf.py.1 docs/conf.py
+	git add setup.py docs/conf.py
+	git commit -m "version update"
+	git checkout master
+
 docs: update-version
 	make -C docs html
 
