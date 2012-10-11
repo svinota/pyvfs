@@ -7,7 +7,7 @@ Welcome to PyVFS's documentation!
 =================================
 
 .. note::
-    This is pre-alpha. We're also surprised, that it works, you know.
+    We're also surprised, that it works, you know.
 
 PyVFS howto
 -----------
