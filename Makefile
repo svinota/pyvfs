@@ -56,6 +56,9 @@ docs: clean update-version
 dist: clean update-version
 	${python} setup.py sdist
 
+rpm: dist
+	rpmbuild -ta dist/*tar.gz
+
 install: clean update-version
 	${python} setup.py install ${root} ${lib}
 
