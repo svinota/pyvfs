@@ -16,9 +16,9 @@
 # 	along with PyVFS; if not, write to the Free Software
 # 	Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
-ifndef python
-	python := "python"
-endif
+version ?= "0.2"
+release ?= "0.2.3"
+python ?= "python"
 
 ifdef root
 	override root := "--root=${root}"
@@ -34,9 +34,12 @@ all:
 
 clean:
 	rm -rf dist build MANIFEST
+	rm -f setup.py
+	rm -f docs/conf.py
 	find . -name "*pyc" -exec rm -f "{}" \;
+	make -C docs clean
 
-manifest: clean
+manifest: clean update-version
 	find pyvfs -name '*.py' >MANIFEST
 
 dist: manifest
@@ -51,6 +54,15 @@ check:
 
 build:
 	:
+
+setup.py docs/conf.py:
+	gawk -v version=${version} -v release=${release} -v flavor=${flavor}\
+		-f configure.gawk $@.in >$@
+
+update-version: setup.py docs/conf.py
+
+docs: update-version
+	make -C docs html
 
 install: manifest
 	${python} setup.py install ${root} ${lib}
