@@ -1,7 +1,7 @@
 pyvfs
 =====
 
-Pre-alfa version of a simple userspace virtual file system implementation.
+A simple userspace virtual file system implementation.
 
  * Documentation: http://peet.spb.ru/pyvfs/
  * Installation: make install
