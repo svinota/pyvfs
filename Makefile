@@ -34,8 +34,6 @@ all:
 
 clean:
 	rm -rf dist build MANIFEST
-	rm -f setup.py
-	rm -f docs/conf.py
 	find . -name "*pyc" -exec rm -f "{}" \;
 	make -C docs clean
 
