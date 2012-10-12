@@ -1,1 +1,1 @@
-tar: .
+tar.gz: . name=pyvfs-@version@

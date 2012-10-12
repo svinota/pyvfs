@@ -8,7 +8,7 @@ URL: https://github.com/svinota/pyvfs
 
 BuildArch: noarch
 BuildPreReq: python-devel rpm-build-python
-Source: %name-%version.tar
+Source: pyvfs-%version.tar.gz
 
 %description
 PyVFS is a simple VFS library written in Python. It consists of
@@ -21,13 +21,13 @@ bundled applications, e.g. pyvfs.objectfs -- the library, that allows
 to represent Python objects as files.
 
 %prep
-%setup
+%setup -q -n pyvfs-%{version}
 
 %install
-%makeinstall python=%{__python} root=%buildroot lib=%{python_sitelibdir}
+%{__python} setup.py install --root=%buildroot --install-lib=%{python_sitelibdir}
 
 %files
-
+%doc README* LICENSE
 %{python_sitelibdir}/pyvfs*
 
 %changelog
