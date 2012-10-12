@@ -1,1 +1,4 @@
 include python-pyvfs.spec
+include README*
+include LICENSE
+

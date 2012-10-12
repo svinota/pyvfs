@@ -8,8 +8,9 @@ setup(name='pyvfs',
     description='Python VFS library',
     author='Peter V. Saveliev',
     author_email='peet@redhat.com',
-    url='http://peet.spb.ru/pyvfs/',
-    license="GPLv3+",
+    url='https://github.com/svinota/pyvfs',
+    license='GPLv3+',
+    description='Simple Python VFS module',
     packages=[
         'pyvfs'
         ]
