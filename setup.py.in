@@ -5,12 +5,11 @@ from distutils.core import setup
 # bump version
 setup(name='pyvfs',
     version='@RELEASE@',
-    description='Python VFS library',
+    description='Simple Python VFS module',
     author='Peter V. Saveliev',
     author_email='peet@redhat.com',
     url='https://github.com/svinota/pyvfs',
     license='GPLv3+',
-    description='Simple Python VFS module',
     packages=[
         'pyvfs'
         ]
