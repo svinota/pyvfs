@@ -48,17 +48,23 @@ setup.py docs/conf.py:
 	gawk -v version=${version} -v release=${release} -v flavor=${flavor}\
 		-f configure.gawk $@.in >$@
 
+clean-version:
+	rm -f setup.py
+	rm -f docs/conf.py
+
 update-version: setup.py docs/conf.py
 
-docs: clean update-version
+force-version: clean-version update-version
+
+docs: clean force-version
 	make -C docs html
 
-dist: clean update-version
+dist: clean force-version
 	${python} setup.py sdist
 
 rpm: dist
 	rpmbuild -ta dist/*tar.gz
 
-install: clean update-version
+install: clean force-version
 	${python} setup.py install ${root} ${lib}
 
