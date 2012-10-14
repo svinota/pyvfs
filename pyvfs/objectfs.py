@@ -331,6 +331,36 @@ class vFunction(vInode):
     def sync(self):
         pass
 
+    def get_args(self, skip=None):
+        if skip is None:
+            skip = []
+        sig = []
+        sig_i = inspect.getargspec(self.observe)
+        # get start index for arguments with default values
+        try:
+            def_start = len(sig_i.args) - len(sig_i.defaults)
+        except:
+            def_start = len(sig_i.args)
+        for i in range(len(sig_i.args)):
+            if sig_i.args[i] in skip:
+                continue
+            if i >= def_start:
+                # get argument with default value
+                value = sig_i.defaults[i - def_start]
+                if isinstance(value, bytes):
+                    value = "\"%s\"" % (value)
+                sig.append("%s=%s" % (sig_i.args[i], value))
+            else:
+                # get argument w/o default value
+                sig.append("%s" % (sig_i.args[i]))
+        # add positional arguments list (if exists)
+        if sig_i.varargs:
+            sig.append("*%s" % (sig_i.varargs))
+        # add keyword arguments dict (if exists)
+        if sig_i.keywords:
+            sig.append("**%s" % (sig_i.keywords))
+        return sig
+
 
 class vFunctionCall(vInode):
     """
@@ -379,31 +409,8 @@ class vFunctionCode(vInode):
         self.seek(0)
         self.truncate()
         # write function signature
-        sig = []
-        sig_i = inspect.getargspec(self.observe)
-        # get start index for arguments with default values
-        try:
-            def_start = len(sig_i.args) - len(sig_i.defaults)
-        except:
-            def_start = len(sig_i.args)
-        for i in range(len(sig_i.args)):
-            if i >= def_start:
-                # get argument with default value
-                value = sig_i.defaults[i - def_start]
-                if isinstance(value, bytes):
-                    value = "\"%s\"" % (value)
-                sig.append("%s=%s" % (sig_i.args[i], value))
-            else:
-                # get argument w/o default value
-                sig.append("%s" % (sig_i.args[i]))
-        # add positional arguments list (if exists)
-        if sig_i.varargs:
-            sig.append("*%s" % (sig_i.varargs))
-        # add keyword arguments dict (if exists)
-        if sig_i.keywords:
-            sig.append("**%s" % (sig_i.keywords))
-        # format the signature
-        self.write("#  %s(%s)\n\n" % (self.parent.name, ", ".join(sig)))
+        self.write("#  %s(%s)\n\n" % (self.parent.name, ", ".join(
+            self.parent.get_args())))
         # write function code
         stdout = sys.stdout
         stderr = sys.stderr
