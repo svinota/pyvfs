@@ -64,7 +64,8 @@ class v9fs(py9p.Server):
         if req.ifcall.mode & py9p.OTRUNC:
             f.seek(0)
             f.truncate()
-        f.sync()
+        else:
+            f.sync()
         srv.respond(req, None)
 
     def walk(self, srv, req, fid=None):
