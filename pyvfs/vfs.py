@@ -165,13 +165,13 @@ class Inode(BytesIO, object):
 
     def wstat(self, stat):
         # change uid?
-        if stat.uidnum != 0xFFFFFFFF:
+        if (stat.uidnum >> 16) != 0xFFFF:
             self.uid = pwd.getpwuid(stat.uidnum).pw_name
         else:
             if stat.uid:
                 self.uid = stat.uid
         # change gid?
-        if stat.gidnum != 0xFFFFFFFF:
+        if (stat.gidnum >> 16) != 0xFFFF:
             self.gid = grp.getgrgid(stat.gidnum).gr_name
         else:
             if stat.gid:
