@@ -189,7 +189,8 @@ class vInode(Inode):
         # force self.observe, bypass property setter
         self.use_weakrefs = weakref
         self.__observe = None
-        self.observe = obj
+        if obj is not None:
+            self.observe = obj
         self.functions = functions
         # repr hack
         if self.mode & stat.S_IFDIR:
