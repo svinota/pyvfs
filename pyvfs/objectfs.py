@@ -37,6 +37,7 @@ import weakref
 import logging
 import traceback
 import inspect
+import uuid
 from abc import ABCMeta
 from pyvfs.vfs import Storage, Inode, Eexist, Eperm
 from pyvfs.utils import Server
@@ -319,12 +320,60 @@ class vInode(Inode):
 
 class vFunction(vInode):
     """
-    The file that represents function as a disassembled code.
-    The fisrt line in the file is the function signature.
+    """
 
-    Read/only.
+    def __init__(self, *argv, **kwarg):
+        vInode.__init__(self, *argv, **kwarg)
+        self.children["code"] = vFunctionCode("code", self)
+        self.children["call"] = vFunctionCall("call", self)
+        self.children["context"] = vFunctionContext("context", self)
+
+    def sync(self):
+        pass
+
+
+class vFunctionCall(vInode):
+    """
     """
     mode = stat.S_IFREG
+
+    @property
+    def observe(self):
+        return self.parent.observe
+
+    def commit(self):
+        parameters = self.getvalue()
+        self.seek(0)
+        self.truncate()
+        self.write("called with parameters:\n\n>> %s" % (parameters))
+
+class vFunctionContext(vInode):
+    """
+    """
+    mode = stat.S_IFREG
+    length = len("call-%s" % (uuid.uuid4()))
+
+    @property
+    def observe(self):
+        return self.parent.observe
+
+    def read(self, size=0):
+        new = vFunctionCall("call-%s" % (uuid.uuid4()), self.parent)
+        self.parent.auto_names.append(new.name)
+        self.seek(0)
+        self.truncate()
+        self.write(new.name)
+        self.seek(0)
+        return vInode.read(self, size)
+
+class vFunctionCode(vInode):
+    """
+    """
+    mode = stat.S_IFREG
+
+    @property
+    def observe(self):
+        return self.parent.observe
 
     def sync(self):
         self.seek(0)
@@ -354,7 +403,7 @@ class vFunction(vInode):
         if sig_i.keywords:
             sig.append("**%s" % (sig_i.keywords))
         # format the signature
-        self.write("#  %s(%s)\n\n" % (self.name, ", ".join(sig)))
+        self.write("#  %s(%s)\n\n" % (self.parent.name, ", ".join(sig)))
         # write function code
         stdout = sys.stdout
         stderr = sys.stderr
