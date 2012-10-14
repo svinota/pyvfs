@@ -32,6 +32,7 @@ import types
 import stat
 import os
 import sys
+import ast
 import dis
 import weakref
 import logging
@@ -41,6 +42,7 @@ import uuid
 from abc import ABCMeta
 from pyvfs.vfs import Storage, Inode, Eexist, Eperm
 from pyvfs.utils import Server
+from ConfigParser import SafeConfigParser
 
 
 Skip = ABCMeta("Skip", (object,), {})
@@ -366,16 +368,34 @@ class vFunctionCall(vInode):
     """
     """
     mode = stat.S_IFREG
+    called = False
 
     @property
     def observe(self):
         return self.parent.observe
 
+    def sync(self):
+        if not self.called:
+            self.seek(0)
+            self.truncate()
+            self.write("[call]\n%s" % ("\n".join(
+                self.parent.get_args(skip=("self",)))))
+
     def commit(self):
-        parameters = self.getvalue()
+        self.called = True
+        self.seek(0)
+        config = SafeConfigParser()
+        try:
+            config.readfp(self)
+            kwarg = dict([(x[0], ast.literal_eval(x[1])) for x
+                    in config.items('call')])
+            result = self.observe(**kwarg)
+        except:
+            result = traceback.format_exc()
         self.seek(0)
         self.truncate()
-        self.write("called with parameters:\n\n>> %s" % (parameters))
+        self.write(str(result))
+
 
 class vFunctionContext(vInode):
     """
@@ -395,6 +415,7 @@ class vFunctionContext(vInode):
         self.write(new.name)
         self.seek(0)
         return vInode.read(self, size)
+
 
 class vFunctionCode(vInode):
     """
