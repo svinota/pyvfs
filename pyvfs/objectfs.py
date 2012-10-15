@@ -596,12 +596,11 @@ def export(*argv, **kwarg):
                     except:
                         parent = vInode(i, parent, mode=stat.S_IFDIR)
             return parent
-        
+
         if isinstance(c, types.FunctionType):
             parent = create_basedir(basedir)
             fs.create(c, root=True, parent=parent,
                     blacklist=blacklist, functions=True, weakref=False)
-
 
         elif isinstance(c, Cls):
             if hasattr(c, "__init__"):
@@ -610,6 +609,7 @@ def export(*argv, **kwarg):
                 def fake_init(*argv, **kwarg):
                     pass
                 old_init = fake_init
+
             def new_init(self, *argv, **kwarg):
                 old_init(self, *argv, **kwarg)
                 parent = create_basedir(basedir)
