@@ -53,6 +53,11 @@ Skip.register(types.GeneratorType)
 Skip.register(types.ModuleType)
 
 
+Cls = ABCMeta("Cls", (object,), {})
+Cls.register(types.ClassType)
+Cls.register(type)
+
+
 Func = ABCMeta("Func", (object,), {})
 Func.register(types.FunctionType)
 Func.register(types.UnboundMethodType)
@@ -580,11 +585,9 @@ def export(*argv, **kwarg):
     weakref = kwarg.get("weakref", True)
 
     def wrap(c):
-        old_init = c.__init__
+        global fs
 
-        def new_init(self, *argv, **kwarg):
-            global fs
-            old_init(self, *argv, **kwarg)
+        def create_basedir(basedir):
             parent = fs.root
             for i in basedir:
                 if i != "":
@@ -592,9 +595,28 @@ def export(*argv, **kwarg):
                         parent = parent.children[i]
                     except:
                         parent = vInode(i, parent, mode=stat.S_IFDIR)
-            fs.create(self, root=True, parent=parent,
-                    blacklist=blacklist, functions=functions, weakref=weakref)
-        c.__init__ = new_init
+            return parent
+        
+        if isinstance(c, types.FunctionType):
+            parent = create_basedir(basedir)
+            fs.create(c, root=True, parent=parent,
+                    blacklist=blacklist, functions=True, weakref=False)
+
+
+        elif isinstance(c, Cls):
+            if hasattr(c, "__init__"):
+                old_init = c.__init__
+            else:
+                def fake_init(*argv, **kwarg):
+                    pass
+                old_init = fake_init
+            def new_init(self, *argv, **kwarg):
+                old_init(self, *argv, **kwarg)
+                parent = create_basedir(basedir)
+                fs.create(self, root=True, parent=parent, blacklist=blacklist,
+                        functions=functions, weakref=weakref)
+            c.__init__ = new_init
+
         return c
 
     if len(argv):
