@@ -515,11 +515,9 @@ class ObjectFS(Storage):
 
         try:
             if isinstance(obj, Func) and kwarg.get("functions", False):
-                new = vFunction(name, parent)
-                parent.add(new)
+                new = vFunction(name, parent, obj=obj, **kwarg)
             elif isinstance(obj, File):
                 new = vLiteral(name, parent)
-                parent.add(new)
             else:
                 new = parent.create(name, mode=stat.S_IFDIR, obj=obj,
                         **kwarg)
