@@ -56,7 +56,6 @@ div.footer a {
 div.related {
     background-color: #133f52;
     line-height: 30px;
-    color: #ffffff;
 }
 
 div.related a {
@@ -67,20 +66,16 @@ div.sphinxsidebar {
 }
 
 div.sphinxsidebar h3 {
-    color: #ffffff;
-    font-size: 1.4em;
+    color: #355f7c;
+    font-size: 1.2em;
     font-weight: normal;
     margin: 0;
     padding: 0;
 }
 
-div.sphinxsidebar h3 a {
-    color: #ffffff;
-}
-
 div.sphinxsidebar h4 {
-    color: #ffffff;
-    font-size: 1.3em;
+    color: #355f7c;
+    font-size: 1.2em;
     font-weight: normal;
     margin: 5px 0 0 0;
     padding: 0;
