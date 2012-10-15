@@ -441,19 +441,23 @@ class vFunctionCode(vInode):
     def sync(self):
         self.seek(0)
         self.truncate()
-        # write function signature
-        self.write("#  %s(%s)\n\n" % (self.parent.name, ", ".join(
-            self.parent.get_args())))
         # write function code
-        stdout = sys.stdout
-        stderr = sys.stderr
         try:
-            sys.stdout = sys.stderr = self
-            dis.dis(self.observe)
+            self.write(inspect.getsource(self.observe))
         except:
-            traceback.print_exc()
-        sys.stdout = stdout
-        sys.stderr = stderr
+            # write function signature
+            self.write("#  %s(%s)\n\n" % (self.parent.name, ", ".join(
+                self.parent.get_args())))
+            # disassemble the code
+            stdout = sys.stdout
+            stderr = sys.stderr
+            try:
+                sys.stdout = sys.stderr = self
+                dis.dis(self.observe)
+            except:
+                traceback.print_exc()
+            sys.stdout = stdout
+            sys.stderr = stderr
 
 
 class vLiteral(vInode):
