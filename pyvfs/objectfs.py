@@ -125,9 +125,16 @@ def _get_name(obj):
     """
     Get automatic name for an object.
     """
-    text = obj.__repr__()
-    if text.find("/") == -1:
-        return text
+    if isinstance(obj, types.FunctionType):
+        return obj.func_name
+
+    try:
+        text = obj.__repr__()
+        if text.find("/") == -1:
+            return text
+    except:
+        pass
+
     try:
         return "%s [0x%x]" % (obj.__class__.__name__, id(obj))
     except:
@@ -497,14 +504,7 @@ class ObjectFS(Storage):
             parent = self.root
 
         if not name:
-            try:
-                # try to get the name, but the object can be
-                # not ready for __repr__
-                name = _get_name(obj)
-            except:
-                # if so, return temporary name, it will be
-                # changed later automatically
-                name = str(id(obj))
+            name = _get_name(obj)
 
         if isinstance(obj, Skip) or \
                 (isinstance(obj, Func) and not kwarg.get("functions", False)):
