@@ -523,8 +523,6 @@ class ObjectFS(Storage):
             else:
                 new = parent.create(name, mode=stat.S_IFDIR, obj=obj,
                         **kwarg)
-                for item in _dir(obj):
-                    self.create(_getattr(obj, item), new, item)
         except:
             return
 
