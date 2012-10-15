@@ -334,6 +334,11 @@ class vInode(Inode):
 
 class vFunction(vInode):
     """
+    A function directory. It contains three files (among others):
+
+    * ``call`` -- function call interface
+    * ``context`` -- creates new ``call`` files
+    * ``code`` -- function source
     """
 
     def __init__(self, *argv, **kwarg):
@@ -378,6 +383,44 @@ class vFunction(vInode):
 
 class vFunctionCall(vInode):
     """
+    The ``call`` file initially contains the function parameters
+    to be filled in. It is in .ini format, all parameters should
+    be placed in the [call] section. Each parameter should have
+    a value (only simple literals allowed yet).
+
+    For example, you have the next ``call`` file::
+
+        [call]
+        arg1
+        arg2 = 20
+        *argv
+        **kwarg
+
+    Then you can fill it like that::
+
+        [call]
+        arg1 = 'some value'
+        arg2 = 20   # 20 was the default value, you can change it
+        argv = [0, 1, 2, 3]
+        kwarg = {"key1": "value1", "key2": "value2"}
+
+    The function then will receive all the parameters you filled.
+    By write()/close() the ``call`` file will run the method.
+
+    .. note::
+        The sequence should be exactly like that:
+            * open()
+            * ... read() parameters tempalte [optional]
+            * write() parameters
+            * close()
+            * open() again
+            * read() function result (or backtrace)
+            * close()
+
+        It can be done by simple shell cat / echo. If you use
+        vim, please note, that by default it does not write files
+        in-place, but use create/mv scheme. It will not work with
+        ``call`` files.
     """
     mode = stat.S_IFREG
     called = False
@@ -411,6 +454,27 @@ class vFunctionCall(vInode):
 
 class vFunctionContext(vInode):
     """
+    The ``context`` file is a dynamic file that creates new
+    call context by reading it. If you want to use several
+    processes to make concurrent calls with ``call`` file, you
+    can face a race condition, like that::
+
+        call file:
+        process1 write() ---> call[1]
+                              results[1]
+                              call[2]    <--- process2 write()
+        process1 read()  <--- results[2] ---> process2 read()
+
+    To avoid such races, you can create new call contexts::
+
+        $ cd function/
+        $ export CONTEXT=`cat context`
+        $ echo $PARAMETERS >$CONTEXT
+        $ export RESULT=`cat $CONTEXT`
+        $ rm -f $CONTEXT
+
+    In other words, by reading ``context`` you generate new
+    ``call``-files, that can be used independently.
     """
     mode = stat.S_IFREG
     length = len("call-%s" % (uuid.uuid4()))
@@ -431,6 +495,9 @@ class vFunctionContext(vInode):
 
 class vFunctionCode(vInode):
     """
+    The ``code`` file contains the function source. If the script
+    can not load the source, ``code`` contains the disassembled
+    code and the function signature.
     """
     mode = stat.S_IFREG
 
