@@ -1,99 +1,49 @@
 .. PyVFS documentation master file, created by
    sphinx-quickstart on Mon Oct  1 17:45:10 2012.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
 
 Welcome to PyVFS's documentation!
 =================================
 
 .. note::
-    We're also surprised, that it works, you know.
+    ... we're also surprised, that it works, you know.
 
-PyVFS howto
------------
+PyVFS introduction
+------------------
 
-VFS
-~~~
+PyVFS by itself is an abstraction layer that allows to build
+FS-like storages. The storage then can be exported with one
+of supported protocols. The storage is completely agnostic
+of the underlying protocol and a developer can choose the one
+that fits better in the requirements.
+
+Two protocols are supported now, **fuse** and **9p**. Fuse
+exports FS only to the local running system, has a reasonable
+performance. The 9p protocol can be used to export the storage
+with several transports: TCP/IP or UNIX socket. Right now
+PyVFS does not support client authorization on 9p sockets.
 
 .. toctree::
     :maxdepth: 2
 
+    vfs_details
     vfs
 
-You can just import VFS as is and start the server. It will create
-a slow and resource-hungry analogue of tmpfs. By itself it has no
-use, unless you want to share your memory-based FS via network. But
-you can write your own file implemenations on the base of ``pyvfs.vfs``.
-E.g., you can parse and utilize the file contents on ``write()``,
-create simple data channels and FS-based RPC interfaces.
-
-The behaviour of the script and how/where you can mount the FS, depends on
-the FS protocol the script uses. By default, ``9p`` is used, but you can
-change it with ``PYVFS_PROTO`` environment variable.
-
-Protocol 9p
-+++++++++++
-
-Environment variables to use with 9p:
-
-    * **PYVFS_PROTO** -- should be set to ``9p`` (it is the default)
-    * **PYVFS_ADDRESS** -- IPv4 address to listen on (default: 127.0.0.1)
-    * **PYVFS_PORT** -- TCP port (default: 10001)
-    * **PYVFS_DEBUG** -- switch the debug output [True/False] (default: False)
-    * **PYVFS_LOG** -- create /log file and logging handler (default: False)
-
-Bash script sample::
-
-    #!/bin/bash
-    export PYVFS_PROTO=9p
-    export PYVFS_ADDRESS=0.0.0.0  # allow public access
-    export PYVFS_LOG=True
-    ./my_script.py
-
-To mount your running script, you can use simple mount call::
-
-    $ sudo mount -t 9p -o port=10001 127.0.0.1 /mnt/pyvfs
-
-Protocol FUSE
-+++++++++++++
-
-.. note::
-    Python FUSE binding uses not Python threading, so, it can not
-    be traced with debugger, e.g. rpdb2, in the same way as py9p.
-
-Environment variables:
-
-    * **PYVFS_PROTO** -- should be set to ``fuse``
-    * **PYVFS_MOUNTPOINT** -- the mountpoint with r/w access (default: ./mnt)
-    * **PYVFS_DEBUG** -- the same as for ``9p``
-    * **PYVFS_LOG** -- the same as for ``9p``
-
-Bash script sample::
-
-    #!/bin/bash
-    export PYVFS_PROTO=fuse
-    export PYVFS_MOUNTPOINT=/home/erkki/mnt
-    export PYVFS_LOG=True
-    ./my_script.py
-    fusermount -u $PYVFS_MOUNTPOINT
-
-The FS will be mounted with your script startup. Do not forget to umount it
-later with fusermount.
-
 ObjectFS
-~~~~~~~~
+--------
 
-.. toctree::
-    :maxdepth: 2
+Objectfs -- ``pyvfs.objectfs`` module -- is a library built
+on top of PyVFS. Objectfs implements a storage and a decorator,
+that can be used to export there any Python object or function.
 
-    first_steps
-    second_steps
+It means, that you will get in the runtime a filesystem, with
+which you can access your live objects.
 
-With ``pyvfs.objectfs`` you can *mount* your Python script (sic)
-and browse exported objects as directories and files. The usage
-is extremely simple::
+The library is not specific for any particular project, and
+can be used in any script. The integration is as simple as
+it is possible. All you need is to import the library and
+decorate functions and/or objects you want to export::
 
-    # just import module and decorator
+    # just import the module and the decorator
     from pyvfs.objectfs import export
 
     ...
@@ -103,21 +53,24 @@ is extremely simple::
     class MyObject(object):
         ...
 
-By default, objectfs creates weak references to your objects.
-It allows proper garbage collection, the object will not stay
-alive only 'cause of one reference from the objectfs.
+    # or functions
+    @export
+    def MyFunction(arg1, arg2="default value", ...):
+        ...
 
-But this scheme works unpredictably when you use ``fuse``
-protocol to access objectfs: some weakrefs can not be dereferenced
-with «object no longer exist» exception, though the object is
-still alive. This causes objects disappear from FS.
+Usage examples:
 
-.. note::
-    Consider usage of 9p protocol together with objectfs,
-    or be ready to miss some objectfs on FS.
+.. toctree::
+    :maxdepth: 2
 
-Also you can use ``weakref=False`` decorator argument, but it will
-prevent objects to be GC'ed.
+    first_steps
+    second_steps
+
+By default, the library uses weak references to objects, that
+allows the Python garbage collector to work properly. All
+objects, that are not referenced anymore (except from the FS)
+will disappear from the FS as well.
+
 
 Implementation and API
 ----------------------

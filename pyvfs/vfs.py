@@ -58,12 +58,13 @@ class Inode(BytesIO, object):
         self.uid = self.muid = pwd.getpwuid(self.uidnum).pw_name
         self.gid = grp.getgrgid(self.gidnum).gr_name
         self.writelock = False
-        if mode & stat.S_IFDIR:
-            self.mode = stat.S_IFDIR | DEFAULT_DIR_MODE
-            self.children["."] = self
-            self.children[".."] = self.parent
-        else:
-            self.mode = stat.S_IFREG | DEFAULT_FILE_MODE
+        if not self.mode:
+            if mode & stat.S_IFDIR:
+                self.mode = stat.S_IFDIR | DEFAULT_DIR_MODE
+                self.children["."] = self
+                self.children[".."] = self.parent
+            else:
+                self.mode = stat.S_IFREG | DEFAULT_FILE_MODE
 
     def __hash__(self):
         return self.path
@@ -165,13 +166,13 @@ class Inode(BytesIO, object):
 
     def wstat(self, stat):
         # change uid?
-        if stat.uidnum != 0xFFFFFFFF:
+        if (stat.uidnum >> 16) != 0xFFFF:
             self.uid = pwd.getpwuid(stat.uidnum).pw_name
         else:
             if stat.uid:
                 self.uid = stat.uid
         # change gid?
-        if stat.gidnum != 0xFFFFFFFF:
+        if (stat.gidnum >> 16) != 0xFFFF:
             self.gid = grp.getgrgid(stat.gidnum).gr_name
         else:
             if stat.gid:
