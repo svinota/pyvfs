@@ -58,12 +58,13 @@ class Inode(BytesIO, object):
         self.uid = self.muid = pwd.getpwuid(self.uidnum).pw_name
         self.gid = grp.getgrgid(self.gidnum).gr_name
         self.writelock = False
-        if mode & stat.S_IFDIR:
-            self.mode = stat.S_IFDIR | DEFAULT_DIR_MODE
-            self.children["."] = self
-            self.children[".."] = self.parent
-        else:
-            self.mode = stat.S_IFREG | DEFAULT_FILE_MODE
+        if not self.mode:
+            if mode & stat.S_IFDIR:
+                self.mode = stat.S_IFDIR | DEFAULT_DIR_MODE
+                self.children["."] = self
+                self.children[".."] = self.parent
+            else:
+                self.mode = stat.S_IFREG | DEFAULT_FILE_MODE
 
     def __hash__(self):
         return self.path

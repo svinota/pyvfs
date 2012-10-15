@@ -8,7 +8,7 @@ objectfs API
     the best documentation is the code itself.
 
 .. automodule:: pyvfs.objectfs
-    :members: export, ObjectFS, vInode, vRepr, vLiteral, vFunction
+    :members: export, ObjectFS, vInode, vRepr, vLiteral, vFunction, vFunctionCall, vFunctionContext, vFunctionCode
 
 .. automodule:: pyvfs.vfs
     :members:
