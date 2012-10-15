@@ -32,14 +32,17 @@ import types
 import stat
 import os
 import sys
+import ast
 import dis
 import weakref
 import logging
 import traceback
 import inspect
+import uuid
 from abc import ABCMeta
 from pyvfs.vfs import Storage, Inode, Eexist, Eperm
 from pyvfs.utils import Server
+from ConfigParser import SafeConfigParser
 
 
 Skip = ABCMeta("Skip", (object,), {})
@@ -48,6 +51,11 @@ Skip.register(types.BuiltinMethodType)
 Skip.register(type)
 Skip.register(types.GeneratorType)
 Skip.register(types.ModuleType)
+
+
+Cls = ABCMeta("Cls", (object,), {})
+Cls.register(types.ClassType)
+Cls.register(type)
 
 
 Func = ABCMeta("Func", (object,), {})
@@ -117,9 +125,16 @@ def _get_name(obj):
     """
     Get automatic name for an object.
     """
-    text = obj.__repr__()
-    if text.find("/") == -1:
-        return text
+    if isinstance(obj, types.FunctionType):
+        return obj.func_name
+
+    try:
+        text = obj.__repr__()
+        if text.find("/") == -1:
+            return text
+    except:
+        pass
+
     try:
         return "%s [0x%x]" % (obj.__class__.__name__, id(obj))
     except:
@@ -189,7 +204,8 @@ class vInode(Inode):
         # force self.observe, bypass property setter
         self.use_weakrefs = weakref
         self.__observe = None
-        self.observe = obj
+        if obj is not None:
+            self.observe = obj
         self.functions = functions
         # repr hack
         if self.mode & stat.S_IFDIR:
@@ -318,17 +334,20 @@ class vInode(Inode):
 
 class vFunction(vInode):
     """
-    The file that represents function as a disassembled code.
-    The fisrt line in the file is the function signature.
-
-    Read/only.
     """
-    mode = stat.S_IFREG
+
+    def __init__(self, *argv, **kwarg):
+        vInode.__init__(self, *argv, **kwarg)
+        self.children["code"] = vFunctionCode("code", self)
+        self.children["call"] = vFunctionCall("call", self)
+        self.children["context"] = vFunctionContext("context", self)
 
     def sync(self):
-        self.seek(0)
-        self.truncate()
-        # write function signature
+        pass
+
+    def get_args(self, skip=None):
+        if skip is None:
+            skip = []
         sig = []
         sig_i = inspect.getargspec(self.observe)
         # get start index for arguments with default values
@@ -337,6 +356,8 @@ class vFunction(vInode):
         except:
             def_start = len(sig_i.args)
         for i in range(len(sig_i.args)):
+            if sig_i.args[i] in skip:
+                continue
             if i >= def_start:
                 # get argument with default value
                 value = sig_i.defaults[i - def_start]
@@ -352,18 +373,91 @@ class vFunction(vInode):
         # add keyword arguments dict (if exists)
         if sig_i.keywords:
             sig.append("**%s" % (sig_i.keywords))
-        # format the signature
-        self.write("#  %s(%s)\n\n" % (self.name, ", ".join(sig)))
-        # write function code
-        stdout = sys.stdout
-        stderr = sys.stderr
+        return sig
+
+
+class vFunctionCall(vInode):
+    """
+    """
+    mode = stat.S_IFREG
+    called = False
+
+    @property
+    def observe(self):
+        return self.parent.observe
+
+    def sync(self):
+        if not self.called:
+            self.seek(0)
+            self.truncate()
+            self.write("[call]\n%s" % ("\n".join(
+                self.parent.get_args(skip=("self",)))))
+
+    def commit(self):
+        self.called = True
+        self.seek(0)
+        config = SafeConfigParser()
         try:
-            sys.stdout = sys.stderr = self
-            dis.dis(self.observe)
+            config.readfp(self)
+            kwarg = dict([(x[0], ast.literal_eval(x[1])) for x
+                    in config.items('call')])
+            result = self.observe(**kwarg)
         except:
-            traceback.print_exc()
-        sys.stdout = stdout
-        sys.stderr = stderr
+            result = traceback.format_exc()
+        self.seek(0)
+        self.truncate()
+        self.write(str(result))
+
+
+class vFunctionContext(vInode):
+    """
+    """
+    mode = stat.S_IFREG
+    length = len("call-%s" % (uuid.uuid4()))
+
+    @property
+    def observe(self):
+        return self.parent.observe
+
+    def read(self, size=0):
+        new = vFunctionCall("call-%s" % (uuid.uuid4()), self.parent)
+        self.parent.auto_names.append(new.name)
+        self.seek(0)
+        self.truncate()
+        self.write(new.name)
+        self.seek(0)
+        return vInode.read(self, size)
+
+
+class vFunctionCode(vInode):
+    """
+    """
+    mode = stat.S_IFREG
+
+    @property
+    def observe(self):
+        return self.parent.observe
+
+    def sync(self):
+        self.seek(0)
+        self.truncate()
+        # write function code
+        try:
+            self.write(inspect.getsource(self.observe))
+        except:
+            # write function signature
+            self.write("#  %s(%s)\n\n" % (self.parent.name, ", ".join(
+                self.parent.get_args())))
+            # disassemble the code
+            stdout = sys.stdout
+            stderr = sys.stderr
+            try:
+                sys.stdout = sys.stderr = self
+                dis.dis(self.observe)
+            except:
+                traceback.print_exc()
+            sys.stdout = stdout
+            sys.stderr = stderr
 
 
 class vLiteral(vInode):
@@ -414,14 +508,7 @@ class ObjectFS(Storage):
             parent = self.root
 
         if not name:
-            try:
-                # try to get the name, but the object can be
-                # not ready for __repr__
-                name = _get_name(obj)
-            except:
-                # if so, return temporary name, it will be
-                # changed later automatically
-                name = str(id(obj))
+            name = _get_name(obj)
 
         if isinstance(obj, Skip) or \
                 (isinstance(obj, Func) and not kwarg.get("functions", False)):
@@ -432,16 +519,12 @@ class ObjectFS(Storage):
 
         try:
             if isinstance(obj, Func) and kwarg.get("functions", False):
-                new = vFunction(name, parent)
-                parent.add(new)
+                new = vFunction(name, parent, obj=obj, **kwarg)
             elif isinstance(obj, File):
                 new = vLiteral(name, parent)
-                parent.add(new)
             else:
                 new = parent.create(name, mode=stat.S_IFDIR, obj=obj,
                         **kwarg)
-                for item in _dir(obj):
-                    self.create(_getattr(obj, item), new, item)
         except:
             return
 
@@ -502,11 +585,9 @@ def export(*argv, **kwarg):
     weakref = kwarg.get("weakref", True)
 
     def wrap(c):
-        old_init = c.__init__
+        global fs
 
-        def new_init(self, *argv, **kwarg):
-            global fs
-            old_init(self, *argv, **kwarg)
+        def create_basedir(basedir):
             parent = fs.root
             for i in basedir:
                 if i != "":
@@ -514,9 +595,28 @@ def export(*argv, **kwarg):
                         parent = parent.children[i]
                     except:
                         parent = vInode(i, parent, mode=stat.S_IFDIR)
-            fs.create(self, root=True, parent=parent,
-                    blacklist=blacklist, functions=functions, weakref=weakref)
-        c.__init__ = new_init
+            return parent
+
+        if isinstance(c, types.FunctionType):
+            parent = create_basedir(basedir)
+            fs.create(c, root=True, parent=parent,
+                    blacklist=blacklist, functions=True, weakref=False)
+
+        elif isinstance(c, Cls):
+            if hasattr(c, "__init__"):
+                old_init = c.__init__
+            else:
+                def fake_init(*argv, **kwarg):
+                    pass
+                old_init = fake_init
+
+            def new_init(self, *argv, **kwarg):
+                old_init(self, *argv, **kwarg)
+                parent = create_basedir(basedir)
+                fs.create(self, root=True, parent=parent, blacklist=blacklist,
+                        functions=functions, weakref=weakref)
+            c.__init__ = new_init
+
         return c
 
     if len(argv):
