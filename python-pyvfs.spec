@@ -1,8 +1,8 @@
 %global pkgname pyvfs
 
 Name: python-%{pkgname}
-Version: 0.2.3
-Release: 2%{?dist}
+Version: 0.2.4
+Release: 1%{?dist}
 Summary: Simple python VFS library
 License: GPLv3+
 Group: Development/Languages
@@ -36,6 +36,10 @@ to represent Python objects as files.
 %{python_sitelib}/%{pkgname}*
 
 %changelog
+* Tue Oct 16 2012 Peter V. Saveliev <peet@redhat.com> 0.2.4-1
+- Function exports added
+- Method calls (by FS read/write) implemented
+
 * Sat Oct 13 2012 Peter V. Saveliev <peet@redhat.com> 0.2.3-2
 - Add build section
 - Change BuildRequires python2-devel
