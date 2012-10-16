@@ -66,6 +66,7 @@ class v9fs(py9p.Server):
             f.truncate()
         else:
             f.sync()
+            f.open()
         srv.respond(req, None)
 
     def walk(self, srv, req, fid=None):
