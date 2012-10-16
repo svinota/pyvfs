@@ -75,7 +75,7 @@ File.register(bool)
 File.register(types.FileType)
 File.register(float)
 File.register(int)
-File.register(int)
+File.register(long)
 File.register(bytes)
 File.register(str)
 File.register(type(None))
@@ -328,8 +328,8 @@ class vInode(Inode):
             for i in to_delete:
                 self.storage.remove(self.children[i].path)
             for i in to_create:
-                self.storage.create(_getattr(self.observe, i),
-                        parent=self, name=i, functions=self.functions)
+                self.storage.create(name=i, parent=self,
+                        obj=_getattr(self.observe, i), functions=self.functions)
 
 
 class vFunction(vInode):
@@ -473,7 +473,7 @@ class vFunctionContext(vInode):
         $ export RESULT=`cat $CONTEXT`
         $ rm -f $CONTEXT
 
-    In other words, by reading ``context`` you generate new
+    In other words, by opening ``context`` you generate new
     ``call``-files, that can be used independently.
     """
     mode = stat.S_IFREG
@@ -483,14 +483,13 @@ class vFunctionContext(vInode):
     def observe(self):
         return self.parent.observe
 
-    def read(self, size=0):
+    def open(self):
         new = vFunctionCall("call-%s" % (uuid.uuid4()), self.parent)
         self.parent.auto_names.append(new.name)
         self.seek(0)
         self.truncate()
         self.write(new.name)
         self.seek(0)
-        return vInode.read(self, size)
 
 
 class vFunctionCode(vInode):
@@ -553,7 +552,7 @@ class ObjectFS(Storage):
     ObjectFS instances, the module starts only one storage.
     """
 
-    def create(self, obj, parent=None, name=None, **kwarg):
+    def create(self, name=None, parent=None, mode=0, obj=None, **kwarg):
         """
         Create an object inode and all the subtree. If ``parent``
         is not defined, attach new inode to the storage root.
@@ -666,7 +665,7 @@ def export(*argv, **kwarg):
 
         if isinstance(c, types.FunctionType):
             parent = create_basedir(basedir)
-            fs.create(c, root=True, parent=parent,
+            fs.create(name=None, root=True, parent=parent, obj=c,
                     blacklist=blacklist, functions=True, weakref=False)
 
         elif isinstance(c, Cls):
@@ -680,8 +679,9 @@ def export(*argv, **kwarg):
             def new_init(self, *argv, **kwarg):
                 old_init(self, *argv, **kwarg)
                 parent = create_basedir(basedir)
-                fs.create(self, root=True, parent=parent, blacklist=blacklist,
-                        functions=functions, weakref=weakref)
+                fs.create(name=None, root=True, parent=parent, obj=self,
+                        blacklist=blacklist, functions=functions,
+                        weakref=weakref)
             c.__init__ = new_init
 
         return c

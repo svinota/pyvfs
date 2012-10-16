@@ -5,7 +5,7 @@ pyvfs.v9fs -- 9pfs connector
 9p2000 abstraction layer, is used to plug VFS into py9p
 """
 import stat
-import py9p
+from py9p import py9p
 
 
 def mode2stat(mode):
@@ -66,6 +66,7 @@ class v9fs(py9p.Server):
             f.truncate()
         else:
             f.sync()
+            f.open()
         srv.respond(req, None)
 
     def walk(self, srv, req, fid=None):

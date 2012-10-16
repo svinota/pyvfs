@@ -130,6 +130,9 @@ class Inode(BytesIO, object):
     def sync(self):
         pass
 
+    def open(self):
+        pass
+
     def add(self, inode):
         if inode.name in list(self.children.keys()):
             raise Eexist()
