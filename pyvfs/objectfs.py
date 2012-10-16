@@ -473,7 +473,7 @@ class vFunctionContext(vInode):
         $ export RESULT=`cat $CONTEXT`
         $ rm -f $CONTEXT
 
-    In other words, by reading ``context`` you generate new
+    In other words, by opening ``context`` you generate new
     ``call``-files, that can be used independently.
     """
     mode = stat.S_IFREG
@@ -483,14 +483,13 @@ class vFunctionContext(vInode):
     def observe(self):
         return self.parent.observe
 
-    def read(self, size=0):
+    def open(self):
         new = vFunctionCall("call-%s" % (uuid.uuid4()), self.parent)
         self.parent.auto_names.append(new.name)
         self.seek(0)
         self.truncate()
         self.write(new.name)
         self.seek(0)
-        return vInode.read(self, size)
 
 
 class vFunctionCode(vInode):
