@@ -98,6 +98,11 @@ class ffs(fuse.Fuse, object):
             inode.gidnum = gid
 
     @checkout
+    def open(self, inode, flags):
+        inode.sync()
+        inode.open()
+
+    @checkout
     def getattr(self, inode):
         inode.sync()
         return fStat(inode)

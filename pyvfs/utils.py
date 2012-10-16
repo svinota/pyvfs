@@ -13,7 +13,7 @@ from pyvfs.vfs import Inode
 protocols = []
 
 try:
-    import py9p
+    from py9p import py9p
     from pyvfs.v9fs import v9fs
     protocols.append("9p")
 except:
