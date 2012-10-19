@@ -78,6 +78,7 @@ File.register(int)
 File.register(long)
 File.register(bytes)
 File.register(str)
+File.register(unicode)
 File.register(type(None))
 
 
