@@ -36,6 +36,7 @@ class Inode(BytesIO, object):
     VFS inode
     """
     mode = 0
+    cleanup = None
     # static member for special names
     special_names = [
             ".",
@@ -49,6 +50,9 @@ class Inode(BytesIO, object):
         self.parent = parent or self
         self.storage = storage or parent.storage
         self.children = {}
+        # if there is no transaction yet, create a blank one
+        if not isinstance(self.cleanup, dict):
+            self.cleanup = {}
         self.name = name
         self.type = 0
         self.dev = 0
@@ -65,6 +69,11 @@ class Inode(BytesIO, object):
                 self.children[".."] = self.parent
             else:
                 self.mode = stat.S_IFREG | DEFAULT_FILE_MODE
+        # all is ok for this moment, so we can clean up
+        # the transaction and create one exit hook
+        self.cleanup = {
+                "storage": (self.storage.destroy, (self.path,))
+                }
 
     def __hash__(self):
         return self.path
@@ -79,6 +88,7 @@ class Inode(BytesIO, object):
             pass
         self.path = int(abs(hash(self.absolute_path())))
         self.storage.register(self)
+        self.cleanup["storage"] = (self.storage.unregister, (self,))
         for (i, k) in [x for x in list(self.children.items())
                 if x[0] not in (".", "..")]:
             k._update_register()
@@ -99,7 +109,12 @@ class Inode(BytesIO, object):
         self.__name = name
         if (self.parent != self) and (self.parent != None):
             self.parent.children[name] = self
-        self._update_register()
+            self.cleanup["name"] = (self.parent.remove, (name,))
+        try:
+            self._update_register()
+        except Exception as e:
+            self.destroy()
+            raise e
 
     name = property(_get_name, _set_name)
 
@@ -132,6 +147,23 @@ class Inode(BytesIO, object):
 
     def open(self):
         pass
+
+    def destroy(self):
+        ret = {}
+        for (i, k) in list(self.cleanup.items()):
+            try:
+                if len(k) < 3:
+                    kwarg = {}
+                else:
+                    kwarg = k[2]
+                if len(k) < 2:
+                    argv = []
+                else:
+                    argv = k[1]
+                ret[i] = k[0](*argv, **kwarg)
+            except Exception as e:
+                ret[i] = e
+        return ret
 
     def add(self, inode):
         if inode.name in list(self.children.keys()):
@@ -269,7 +301,7 @@ class Storage(object):
             data = f.read(size)
         return data
 
-    def remove(self, target):
+    def destroy(self, target):
         with self.lock:
             f = self.checkout(target)
             for i, k in list(f.children.items()):
@@ -277,6 +309,11 @@ class Storage(object):
                     self.remove(k.path)
             f.parent.remove(f)
             self.unregister(f)
+
+    def remove(self, target):
+        with self.lock:
+            f = self.checkout(target)
+            f.destroy()
 
     def wstat(self, target, stat):
         with self.lock:
