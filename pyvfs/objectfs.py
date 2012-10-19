@@ -251,9 +251,6 @@ class vInode(Inode):
 
     def _set_observe(self, obj):
 
-        if isinstance(obj, File):
-            return
-
         try:
             # we can not use callback here, 'cause it forces
             # weakref to generate different proxies for one
