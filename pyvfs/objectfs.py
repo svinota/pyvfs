@@ -183,8 +183,7 @@ class vInode(Inode):
             ]
 
     def __init__(self, name, parent=None, mode=0, storage=None,
-            obj=None, root=None, blacklist=None, weakref=True,
-            functions=False):
+            obj=None, root=None, **kwarg):
 
         # respect preset mode
         if not (mode | self.mode):
@@ -197,19 +196,31 @@ class vInode(Inode):
             self.stack = {}
         self.root = root
         self.blacklist = None
-        self.blacklist = blacklist or self.parent.blacklist
+        self.blacklist = kwarg.get("blacklist", None) or \
+                self.parent.blacklist
         if isinstance(self.blacklist, List):
             if self.absolute_path(stop=self.get_root()) in self.blacklist:
-                self.storage.remove(self.path)
+                self.destroy()
                 raise Eperm()
         # force self.observe, bypass property setter
-        self.use_weakrefs = weakref
+        self.use_weakrefs = kwarg.get("weakref", True)
         self.__observe = None
-        if obj is not None:
-            self.observe = obj
-        self.functions = functions
-        # repr hack
-        if self.mode & stat.S_IFDIR:
+        # create the hook to the object only on the object root vInode
+        try:
+            if self.root:
+                self.observe = obj
+                self.stack[id(self.observe)] = self
+            else:
+                # cycle links detection
+                if kwarg.get("cycle_detect", True):
+                    self._check_cycle()
+        except Exception as e:
+            self.destroy()
+            raise e
+        if kwarg.get("cycle_detect", True):
+            self.cleanup["stack"] = (self.stack.pop, (id(self.observe),))
+        self.functions = kwarg.get("functions", False)
+        if (self.mode & stat.S_IFDIR) and kwarg.get("repr", True):
             self.children[".repr"] = vRepr(".repr", self)
 
     def get_root(self):
@@ -249,31 +260,28 @@ class vInode(Inode):
             # object and it breaks cycle reference detection
             #
             # this won't work: lambda x: self.storage.remove(self.path)
+            if not self.use_weakrefs:
+                raise Exception()
             wp = weakref.proxy(obj)
         except:
             wp = obj
 
-        if id(wp) in list(self.stack.keys()):
-            self.storage.remove(self.path)
-            raise Eexist()
-        try:
-            del self.stack[id(self.__observe)]
-        except:
-            pass
-        self.stack[id(wp)] = True
-
-        if not self.root:
-            return
-
-        try:
-            if id(wp) == id(self.__observe):
-                return
-        except:
-            pass
-
         self.__observe = wp
 
     observe = property(_get_observe, _set_observe)
+
+    def _check_cycle(self):
+        try:
+            if not self.use_weakrefs:
+                raise Exception()
+            self_id = id(weakref.proxy(self.observe))
+        except:
+            self_id = id(self.observe)
+        if self_id in list(self.stack.keys()):
+            self.storage.remove(self.path)
+            raise Eexist("%s (%s)" % (self_id,
+                self.stack[self_id].absolute_path()))
+        self.stack[self_id] = self
 
     def commit(self):
         """
@@ -315,7 +323,7 @@ class vInode(Inode):
                             if _get_name(k.observe) != i:
                                 k.name = _get_name(k.observe)
                 except:
-                    self.storage.remove(k.path)
+                    k.destroy()
         else:
             chs = set(self.children.keys())
             try:
@@ -327,10 +335,12 @@ class vInode(Inode):
                     set(self.auto_names)
             to_create = obs - chs
             for i in to_delete:
-                self.storage.remove(self.children[i].path)
+                self.children[i].destroy()
             for i in to_create:
                 self.storage.create(name=i, parent=self,
-                        obj=_getattr(self.observe, i), functions=self.functions)
+                        obj=_getattr(self.observe, i),
+                        functions=self.functions,
+                        weakref=self.use_weakrefs)
 
 
 class vFunction(vInode):
@@ -344,9 +354,15 @@ class vFunction(vInode):
 
     def __init__(self, *argv, **kwarg):
         vInode.__init__(self, *argv, **kwarg)
-        self.children["code"] = vFunctionCode("code", self)
-        self.children["call"] = vFunctionCall("call", self)
-        self.children["context"] = vFunctionContext("context", self)
+        try:
+            self.children["code"] = vFunctionCode("code", self,
+                    cycle_detect=False)
+            self.children["call"] = vFunctionCall("call", self,
+                    cycle_detect=False)
+            self.children["context"] = vFunctionContext("context", self,
+                    cycle_detect=False)
+        except:
+            self.destroy()
 
     def sync(self):
         pass
@@ -485,7 +501,8 @@ class vFunctionContext(vInode):
         return self.parent.observe
 
     def open(self):
-        new = vFunctionCall("call-%s" % (uuid.uuid4()), self.parent)
+        new = vFunctionCall("call-%s" % (uuid.uuid4()), self.parent,
+                cycle_detect=False)
         self.parent.auto_names.append(new.name)
         self.seek(0)
         self.truncate()
