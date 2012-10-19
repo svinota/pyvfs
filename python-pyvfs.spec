@@ -1,7 +1,7 @@
 %global pkgname pyvfs
 
 Name: python-%{pkgname}
-Version: 0.2.4
+Version: 0.2.5
 Release: 1%{?dist}
 Summary: Simple python VFS library
 License: GPLv3+
@@ -36,6 +36,10 @@ to represent Python objects as files.
 %{python_sitelib}/%{pkgname}*
 
 %changelog
+* Fri Oct 19 2012 Peter V. Saveliev <peet@redhat.com> 0.2.5-1
+- new cycle detection mechanism for objectfs
+- transaction-like cleanup for Inode class
+
 * Tue Oct 16 2012 Peter V. Saveliev <peet@redhat.com> 0.2.4-1
 - Function exports added
 - Method calls (by FS read/write) implemented
