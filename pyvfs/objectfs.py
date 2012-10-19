@@ -585,29 +585,31 @@ class ObjectFS(Storage):
         note that you can affect the autonaming with ``__repr__()``
         method.
         """
-        if not parent:
-            parent = self.root
+        with self.lock:
+            if not parent:
+                parent = self.root
 
-        if not name:
-            name = _get_name(obj)
+            if not name:
+                name = _get_name(obj)
 
-        if isinstance(obj, Skip) or \
-                (isinstance(obj, Func) and not kwarg.get("functions", False)):
-            return
+            if isinstance(obj, Skip) or \
+                    (isinstance(obj, Func) and not \
+                    kwarg.get("functions", False)):
+                return
 
-        if name.startswith("_"):
-            return
+            if name.startswith("_"):
+                return
 
-        try:
-            if isinstance(obj, Func) and kwarg.get("functions", False):
-                new = vFunction(name, parent, obj=obj, **kwarg)
-            elif isinstance(obj, File):
-                new = vLiteral(name, parent)
-            else:
-                new = parent.create(name, mode=stat.S_IFDIR, obj=obj,
-                        **kwarg)
-        except:
-            return
+            try:
+                if isinstance(obj, Func) and kwarg.get("functions", False):
+                    new = vFunction(name, parent, obj=obj, **kwarg)
+                elif isinstance(obj, File):
+                    new = vLiteral(name, parent)
+                else:
+                    new = parent.create(name, mode=stat.S_IFDIR, obj=obj,
+                            **kwarg)
+            except:
+                return
 
         return new
 
