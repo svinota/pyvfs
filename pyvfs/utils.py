@@ -47,6 +47,9 @@ class logInode(Inode):
         for i in self.deque:
             Inode.write(self, i)
 
+    def commit(self):
+        self.deque.clear()
+
     def write(self, value):
         self.deque.append(value)
 
