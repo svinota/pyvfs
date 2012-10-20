@@ -67,6 +67,8 @@ class Inode(BytesIO, object):
                 self.mode = stat.S_IFDIR | DEFAULT_DIR_MODE
                 self.children["."] = self
                 self.children[".."] = self.parent
+            elif mode == stat.S_IFLNK:
+                self.mode = mode
             else:
                 self.mode = stat.S_IFREG | DEFAULT_FILE_MODE
         # all is ok for this moment, so we can clean up
