@@ -43,7 +43,7 @@ class Inode(BytesIO, object):
             "..",
             ]
 
-    def __init__(self, name, parent=None, mode=0, storage=None):
+    def __init__(self, name, parent=None, mode=0, storage=None, **kwarg):
 
         BytesIO.__init__(self)
 
@@ -183,13 +183,14 @@ class Inode(BytesIO, object):
         inode.parent = None
         del self.children[inode.name]
 
-    def create(self, name, mode=0, **kwarg):
+    def create(self, name, mode=0, klass=None, **kwarg):
         """
         Create a child in a directory
         """
         self._check_special(name)
-        # return default Inode class
-        self.children[name] = type(self)(name, self, mode=mode,
+        if klass is None:
+            klass = type(self)
+        self.children[name] = klass(name, self, mode=mode,
             storage=self.storage, **kwarg)
         return self.children[name]
 
