@@ -194,6 +194,7 @@ class vInode(Inode):
             self.stack = self.parent.stack
         else:
             self.stack = {}
+        self.kwarg = kwarg
         self.root = root
         self.blacklist = None
         self.blacklist = kwarg.get("blacklist", None) or \
@@ -203,8 +204,8 @@ class vInode(Inode):
                 self.destroy()
                 raise Eperm()
         # force self.observe, bypass property setter
-        self.use_weakrefs = kwarg.get("weakref", True)
         self.__observe = None
+        cycle_detect = kwarg.get("cycle_detect", "symlink")
         # create the hook to the object only on the object root vInode
         try:
             if self.root:
@@ -212,16 +213,26 @@ class vInode(Inode):
                 self.stack[id(self.observe)] = self
             else:
                 # cycle links detection
-                if kwarg.get("cycle_detect", True):
+                if cycle_detect != "none":
                     self._check_cycle()
+        except Eexist as e:
+            if cycle_detect == "symlink":
+                self.write(self.relative_path(e.target.absolute_path()))
+                e.target.cleanup[str(id(self))] = (
+                        self.storage.destroy, (self.path,))
+                self.mode = stat.S_IFLNK
+            else:
+                self.destroy()
+                raise e
         except Exception as e:
             self.destroy()
             raise e
-        if kwarg.get("cycle_detect", True):
-            self.cleanup["stack"] = (self.stack.pop, (id(self.observe),))
-        self.functions = kwarg.get("functions", False)
         if (self.mode & stat.S_IFDIR) and kwarg.get("repr", True):
             self.children[".repr"] = vRepr(".repr", self)
+
+    def relative_path(self, target):
+        to_root = [".."] * (len(self.absolute_path().split("/")) - 2)
+        return "%s%s" % ("/".join(to_root), target)
 
     def get_root(self):
         if self.root:
@@ -257,7 +268,7 @@ class vInode(Inode):
             # object and it breaks cycle reference detection
             #
             # this won't work: lambda x: self.storage.remove(self.path)
-            if not self.use_weakrefs:
+            if not self.kwarg.get("weakref", True):
                 raise Exception()
             wp = weakref.proxy(obj)
         except:
@@ -269,16 +280,15 @@ class vInode(Inode):
 
     def _check_cycle(self):
         try:
-            if not self.use_weakrefs:
+            if not self.kwarg.get("weakref", True):
                 raise Exception()
             self_id = id(weakref.proxy(self.observe))
         except:
             self_id = id(self.observe)
         if self_id in list(self.stack.keys()):
-            self.storage.remove(self.path)
-            raise Eexist("%s (%s)" % (self_id,
-                self.stack[self_id].absolute_path()))
+            raise Eexist(self.stack[self_id])
         self.stack[self_id] = self
+        self.cleanup["stack"] = (self.stack.pop, (id(self.observe),))
 
     def commit(self):
         """
@@ -335,9 +345,7 @@ class vInode(Inode):
                 self.children[i].destroy()
             for i in to_create:
                 self.storage.create(name=i, parent=self,
-                        obj=_getattr(self.observe, i),
-                        functions=self.functions,
-                        weakref=self.use_weakrefs)
+                        obj=_getattr(self.observe, i), **self.kwarg)
 
 
 class vFunction(vInode):
@@ -353,11 +361,11 @@ class vFunction(vInode):
         vInode.__init__(self, *argv, **kwarg)
         try:
             self.children["code"] = vFunctionCode("code", self,
-                    cycle_detect=False)
+                    cycle_detect="drop")
             self.children["call"] = vFunctionCall("call", self,
-                    cycle_detect=False)
+                    cycle_detect="drop")
             self.children["context"] = vFunctionContext("context", self,
-                    cycle_detect=False)
+                    cycle_detect="drop")
         except:
             self.destroy()
 
@@ -499,7 +507,7 @@ class vFunctionContext(vInode):
 
     def open(self):
         new = vFunctionCall("call-%s" % (uuid.uuid4()), self.parent,
-                cycle_detect=False)
+                cycle_detect="drop")
         self.parent.auto_names.append(new.name)
         self.seek(0)
         self.truncate()
@@ -601,13 +609,21 @@ class ObjectFS(Storage):
                 return
 
             try:
-                if isinstance(obj, Func) and kwarg.get("functions", False):
-                    new = vFunction(name, parent, obj=obj, **kwarg)
-                elif isinstance(obj, File):
-                    new = vLiteral(name, parent)
-                else:
-                    new = parent.create(name, mode=stat.S_IFDIR, obj=obj,
-                            **kwarg)
+                klass = Inode
+                mode = stat.S_IFREG
+                if len(kwarg.keys()) > 0:
+                    if isinstance(obj, Func) and \
+                            kwarg.get("functions", False):
+                        klass = vFunction
+                        mode = stat.S_IFDIR
+                    elif isinstance(obj, File):
+                        klass = vLiteral
+                        mode = stat.S_IFREG
+                    else:
+                        klass = vInode
+                        mode = stat.S_IFDIR
+                new = parent.create(name, klass=klass,
+                        mode=mode, obj=obj, **kwarg)
             except:
                 return
 
@@ -666,6 +682,7 @@ def export(*argv, **kwarg):
     blacklist = kwarg.get("blacklist", [])
     functions = kwarg.get("functions", False)
     weakref = kwarg.get("weakref", True)
+    cycle_detect = kwarg.get("cycle_detect", "symlink")
 
     def wrap(c):
         global fs

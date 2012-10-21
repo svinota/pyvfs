@@ -67,6 +67,11 @@ class ffs(fuse.Fuse, object):
         self.storage = storage
         self.root = self.storage.root
 
+    def symlink(self, path, dest):
+        self.mknod(path, stat.S_IFLNK, 0)
+        inode = self.storage.checkout(hash8(path))
+        inode.write(dest)
+
     def mknod(self, path, mode, dev):
         # work only with regular files
         if dev:
@@ -80,6 +85,10 @@ class ffs(fuse.Fuse, object):
 
     def mkdir(self, path, mode):
         return self.mknod(path, mode, None)
+
+    @checkout
+    def readlink(self, inode):
+        return inode.getvalue()
 
     @checkout
     def flush(self, inode):
@@ -121,6 +130,7 @@ class ffs(fuse.Fuse, object):
     def truncate(self, inode, size):
         inode.seek(size)
         inode.truncate()
+        inode.commit()
 
     @checkout
     def utime(self, inode, times):

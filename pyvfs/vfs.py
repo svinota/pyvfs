@@ -24,7 +24,9 @@ class Eperm(Exception):
 
 
 class Eexist(Exception):
-    pass
+    def __init__(self, target=None):
+        Exception.__init__(self, str(target))
+        self.target = target
 
 
 class Edebug(Exception):
@@ -43,7 +45,7 @@ class Inode(BytesIO, object):
             "..",
             ]
 
-    def __init__(self, name, parent=None, mode=0, storage=None):
+    def __init__(self, name, parent=None, mode=0, storage=None, **kwarg):
 
         BytesIO.__init__(self)
 
@@ -67,6 +69,8 @@ class Inode(BytesIO, object):
                 self.mode = stat.S_IFDIR | DEFAULT_DIR_MODE
                 self.children["."] = self
                 self.children[".."] = self.parent
+            elif mode == stat.S_IFLNK:
+                self.mode = mode
             else:
                 self.mode = stat.S_IFREG | DEFAULT_FILE_MODE
         # all is ok for this moment, so we can clean up
@@ -100,7 +104,7 @@ class Inode(BytesIO, object):
         self._check_special(name)
         try:
             if name in list(self.parent.children.keys()):
-                raise Eexist()
+                raise Eexist(self.parent.children[name])
             del self.parent.children[self.name]
         except Eexist as e:
             raise e
@@ -181,13 +185,14 @@ class Inode(BytesIO, object):
         inode.parent = None
         del self.children[inode.name]
 
-    def create(self, name, mode=0, **kwarg):
+    def create(self, name, mode=0, klass=None, **kwarg):
         """
         Create a child in a directory
         """
         self._check_special(name)
-        # return default Inode class
-        self.children[name] = type(self)(name, self, mode=mode,
+        if klass is None:
+            klass = type(self)
+        self.children[name] = klass(name, self, mode=mode,
             storage=self.storage, **kwarg)
         return self.children[name]
 
