@@ -609,13 +609,21 @@ class ObjectFS(Storage):
                 return
 
             try:
-                if isinstance(obj, Func) and kwarg.get("functions", False):
-                    new = vFunction(name, parent, obj=obj, **kwarg)
-                elif isinstance(obj, File):
-                    new = vLiteral(name, parent)
-                else:
-                    new = parent.create(name, mode=stat.S_IFDIR, obj=obj,
-                            **kwarg)
+                klass = Inode
+                mode = stat.S_IFREG
+                if len(kwarg.keys()) > 0:
+                    if isinstance(obj, Func) and \
+                            kwarg.get("functions", False):
+                        klass = vFunction
+                        mode = stat.S_IFDIR
+                    elif isinstance(obj, File):
+                        klass = vLiteral
+                        mode = stat.S_IFREG
+                    else:
+                        klass = vInode
+                        mode = stat.S_IFDIR
+                new = parent.create(name, klass=klass,
+                        mode=mode, obj=obj, **kwarg)
             except:
                 return
 
