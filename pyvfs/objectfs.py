@@ -677,6 +677,18 @@ def export(*argv, **kwarg):
           False). When True, the files will contain disassembled function
           code.
         * **weakref** -- Use weak references to this object (default: True)
+        * **cycle_detect** -- The cycle reference detection mode. Can be:
+            * ``none`` -- No cycle detection, the FS will not try
+              to watch references to the object from existing inodes.
+              So, if the object (or one of its children) will have a
+              reference to itself, it will be represented on the FS
+              as a new subdirectory, and so forth to the infinity.
+            * ``symlink`` -- Inodes, referencing the same objects, as
+              an existing inode does, will be created as symlinks.
+              This is the default behaviour.
+            * ``drop`` -- Such inodes will not be created at all. If
+              you want your FS for some reason be searchable by
+              recursive grep, you should use this option.
     """
     basedir = kwarg.get("basedir", "").split("/")
     blacklist = kwarg.get("blacklist", [])
