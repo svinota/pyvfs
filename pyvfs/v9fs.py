@@ -71,6 +71,7 @@ class v9fs(py9p.Server):
         if req.ifcall.mode & py9p.OTRUNC:
             f.seek(0)
             f.truncate()
+            f.commit()
         else:
             f.sync()
             f.open()

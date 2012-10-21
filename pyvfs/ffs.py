@@ -130,6 +130,7 @@ class ffs(fuse.Fuse, object):
     def truncate(self, inode, size):
         inode.seek(size)
         inode.truncate()
+        inode.commit()
 
     @checkout
     def utime(self, inode, times):
