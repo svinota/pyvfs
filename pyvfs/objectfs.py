@@ -727,7 +727,7 @@ def export(*argv, **kwarg):
                 parent = create_basedir(basedir)
                 fs.create(name=None, root=True, parent=parent, obj=self,
                         blacklist=blacklist, functions=functions,
-                        weakref=weakref)
+                        weakref=weakref, cycle_detect=cycle_detect)
             c.__init__ = new_init
 
         return c
