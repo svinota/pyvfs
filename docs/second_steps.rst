@@ -1,7 +1,7 @@
 .. _second_steps:
 
-Second steps
-------------
+Complex example
+---------------
 
 .. literalinclude:: ../examples/second_steps.py
     :linenos:

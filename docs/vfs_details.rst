@@ -3,23 +3,15 @@
 PyVFS protocols setup
 ---------------------
 
-Simple PyVFS example:
+How you can access your filesystem, depends on the environment
+variables. To set them up, you can use shell, or directly
+modify ``os.environ`` dictionary prior to starting the server.
+It is done this way to simplify the integration with existing
+complex projects, including system daemons written in Python.
 
-.. toctree::
-    :maxdepth: 2
-
-    vfs
-
-You can just import VFS as is and start the server. It will create
-a slow and resource-hungry analogue of tmpfs. By itself it has no
-use, unless you want to share your memory-based FS via network. But
-you can write your own file implemenations on the base of ``pyvfs.vfs``.
-E.g., you can parse and utilize the file contents on ``write()``,
-create simple data channels and FS-based RPC interfaces.
-
-The behaviour of the script and how/where you can mount the FS, depends on
-the FS protocol the script uses. By default, ``9p`` is used, but you can
-change it with ``PYVFS_PROTO`` environment variable.
+There are several environment variables, that affect on the
+library behaviour. The full list you can read in the API docs.
+Most important are:
 
 Protocol 9p
 +++++++++++
@@ -27,22 +19,21 @@ Protocol 9p
 Environment variables to use with 9p:
 
     * **PYVFS_PROTO** -- should be set to ``9p`` (it is the default)
-    * **PYVFS_ADDRESS** -- IPv4 address to listen on (default: 127.0.0.1)
+    * **PYVFS_ADDRESS** -- IPv4 address to listen on (default: 127.0.0.1),
+      or UNIX socket path, e.g. /tmp/my_vfs
     * **PYVFS_PORT** -- TCP port (default: 10001)
-    * **PYVFS_DEBUG** -- switch the debug output [True/False] (default: False)
-    * **PYVFS_LOG** -- create /log file and logging handler (default: False)
+    * **PYVFS_DEBUG** -- switch the debug output [True/False]
+      (default: False)
+    * **PYVFS_LOG** -- create /log file and logging handler [True/False]
+      (default: False)
 
 Bash script sample::
 
     #!/bin/bash
     export PYVFS_PROTO=9p
-    export PYVFS_ADDRESS=0.0.0.0  # allow public access
+    export PYVFS_ADDRESS=/tmp/my_vfs
     export PYVFS_LOG=True
     ./my_script.py
-
-To mount your running script, you can use simple mount call::
-
-    $ sudo mount -t 9p -o port=10001 127.0.0.1 /mnt/pyvfs
 
 Protocol FUSE
 +++++++++++++
@@ -54,7 +45,8 @@ Protocol FUSE
 Environment variables:
 
     * **PYVFS_PROTO** -- should be set to ``fuse``
-    * **PYVFS_MOUNTPOINT** -- the mountpoint with r/w access (default: ./mnt)
+    * **PYVFS_MOUNTPOINT** -- the mountpoint with r/w access
+      (default: ./mnt)
     * **PYVFS_DEBUG** -- the same as for ``9p``
     * **PYVFS_LOG** -- the same as for ``9p``
 
@@ -67,6 +59,45 @@ Bash script sample::
     ./my_script.py
     fusermount -u $PYVFS_MOUNTPOINT
 
-The FS will be mounted with your script startup. Do not forget to umount it
-later with fusermount.
+Mount the FS
+++++++++++++
 
+In the case of ``fuse`` protocol usage, the FS will be mounted
+already with the script start.
+
+.. note::
+    You should have write permissions to the mountpoint.
+    Also, by default you should have exactly the same euid/egid
+    pair to access mounted FUSE fs, as the server does.
+
+In the case of ``9p`` protocol, you can mount your FS several times
+or just browse it with command-line 9p-clients.
+
+.. note::
+    The library does not implement yet client authentication
+    for the 9p-sockets. Use UNIX sockets or, at least, do not use
+    "0.0.0.0" address unless you fully undestand what are you doing.
+
+Examples with Linux kernel v9fs implementation::
+
+    1. mount from UNIX-socket:
+       $ sudo mount -t 9p -o trans=unix /tmp/my_vfs /mnt
+
+    2. mount from an IP-address:
+       $ sudo mount -t 9p -o port=10001 127.0.0.1 /mnt
+ 
+.. note::
+    There can be serious latency if you use 9p over low-speed
+    connections. Moreover, if the TCP connection became broken, any
+    FS operations like read/write/df etc. will stall.
+
+Umount the FS
++++++++++++++
+
+Do not forget to umount your filesystem after usage::
+
+    1. in the case of FUSE:
+       $ fusermount -u ~/mnt
+
+    2. in the case of 9p:
+       $ sudo umount /mnt
