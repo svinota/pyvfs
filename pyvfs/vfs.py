@@ -24,7 +24,9 @@ class Eperm(Exception):
 
 
 class Eexist(Exception):
-    pass
+    def __init__(self, target=None):
+        Exception.__init__(self, str(target))
+        self.target = target
 
 
 class Edebug(Exception):
@@ -102,7 +104,7 @@ class Inode(BytesIO, object):
         self._check_special(name)
         try:
             if name in list(self.parent.children.keys()):
-                raise Eexist()
+                raise Eexist(self.parent.children[name])
             del self.parent.children[self.name]
         except Eexist as e:
             raise e
