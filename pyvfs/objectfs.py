@@ -468,6 +468,8 @@ class vFunctionCall(vInode):
                 self.parent.get_args(skip=("self",)))))
 
     def commit(self):
+        if self.length == 0:
+            return
         self.called = True
         self.seek(0)
         config = SafeConfigParser()
