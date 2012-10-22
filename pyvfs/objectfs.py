@@ -143,7 +143,17 @@ def _get_name(obj):
         pass
 
     try:
-        return "%s [0x%x]" % (obj.__class__.__name__, id(obj))
+        obj_id = "0x%x" % (id(obj))
+        for i in ("key", "name", "id"):
+            try:
+                text = str(getattr(obj, i))
+                if text.find("/") == -1:
+                    obj_id = text
+                    break
+            except:
+                pass
+
+        return "%s [%s]" % (obj.__class__.__name__, obj_id)
     except:
         return "0x%x" % (id(obj))
 
