@@ -70,6 +70,12 @@ List.register(tuple)
 List.register(frozenset)
 
 
+String = ABCMeta("String", (object,), {})
+String.register(str)
+String.register(bytes)
+String.register(unicode)
+
+
 File = ABCMeta("File", (object,), {})
 File.register(bool)
 File.register(types.FileType)
@@ -117,7 +123,7 @@ def _dir(obj):
     if isinstance(obj, List):
         return [str(x) for x in range(len(obj))]
     elif isinstance(obj, dict):
-        return [x for x in list(obj.keys()) if isinstance(x, bytes)]
+        return [str(x) for x in list(obj.keys()) if isinstance(x, String)]
     else:
         return [x for x in dir(obj) if not x.startswith("_")]
 
@@ -137,7 +143,17 @@ def _get_name(obj):
         pass
 
     try:
-        return "%s [0x%x]" % (obj.__class__.__name__, id(obj))
+        obj_id = "0x%x" % (id(obj))
+        for i in ("key", "name", "id"):
+            try:
+                text = str(getattr(obj, i))
+                if text.find("/") == -1:
+                    obj_id = text
+                    break
+            except:
+                pass
+
+        return "%s [%s]" % (obj.__class__.__name__, obj_id)
     except:
         return "0x%x" % (id(obj))
 
@@ -213,7 +229,7 @@ class vInode(Inode):
                 self.stack[id(self.observe)] = self
             else:
                 # cycle links detection
-                if cycle_detect != "none":
+                if cycle_detect != "none" and self.mode & stat.S_IFDIR:
                     self._check_cycle()
         except Eexist as e:
             if cycle_detect == "symlink":
@@ -330,6 +346,8 @@ class vInode(Inode):
                             if _get_name(k.observe) != i:
                                 k.name = _get_name(k.observe)
                 except:
+                    logging.debug("destroying %s" % (k.name))
+                    logging.debug("%s" % (k.cleanup))
                     k.destroy()
         else:
             chs = set(self.children.keys())
@@ -358,16 +376,19 @@ class vFunction(vInode):
     """
 
     def __init__(self, *argv, **kwarg):
+        kwarg['cycle_detect'] = 'none'
+
         vInode.__init__(self, *argv, **kwarg)
         try:
             self.children["code"] = vFunctionCode("code", self,
-                    cycle_detect="drop")
+                    cycle_detect="none")
             self.children["call"] = vFunctionCall("call", self,
-                    cycle_detect="drop")
+                    cycle_detect="none")
             self.children["context"] = vFunctionContext("context", self,
-                    cycle_detect="drop")
-        except:
+                    cycle_detect="none")
+        except Exception as e:
             self.destroy()
+            raise e
 
     def sync(self):
         pass
@@ -459,6 +480,8 @@ class vFunctionCall(vInode):
                 self.parent.get_args(skip=("self",)))))
 
     def commit(self):
+        if self.length == 0:
+            return
         self.called = True
         self.seek(0)
         config = SafeConfigParser()
@@ -507,7 +530,7 @@ class vFunctionContext(vInode):
 
     def open(self):
         new = vFunctionCall("call-%s" % (uuid.uuid4()), self.parent,
-                cycle_detect="drop")
+                cycle_detect="none")
         self.parent.auto_names.append(new.name)
         self.seek(0)
         self.truncate()
@@ -706,7 +729,8 @@ def export(*argv, **kwarg):
                     try:
                         parent = parent.children[i]
                     except:
-                        parent = vInode(i, parent, mode=stat.S_IFDIR)
+                        parent = vInode(i, parent, mode=stat.S_IFDIR,
+                                cycle_detect="none")
             return parent
 
         if isinstance(c, types.FunctionType):
