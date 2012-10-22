@@ -9,11 +9,16 @@ from py9p import py9p
 
 
 def mode2stat(mode):
-    return (mode & 0o777) | ((mode & py9p.DMDIR) >> 17)
+    return (mode & 0o777) |\
+            ((mode & py9p.DMDIR) >> 17) |\
+            ((mode & py9p.DMSYMLINK) >> 10) |\
+            ((mode & py9p.DMSYMLINK) >> 12)
 
 
 def mode2plan(mode):
-    return (mode & 0o777) | ((mode & stat.S_IFDIR) << 17)
+    return (mode & 0o777) | \
+            ((mode & stat.S_IFDIR) << 17) |\
+            (int(mode == stat.S_IFLNK) << 25)
 
 
 def inode2dir(inode):
@@ -55,6 +60,8 @@ class v9fs(py9p.Server):
         f = self.storage.checkout(req.fid.qid.path)
         new = self.storage.create(req.ifcall.name, f,
             mode2stat(req.ifcall.perm))
+        if new.mode == stat.S_IFLNK:
+            new.write(req.ifcall.extension)
         req.ofcall.qid = py9p.Qid((req.ifcall.perm >> 24) & py9p.QTDIR, 0,
             new.path)
         srv.respond(req, None)
@@ -64,6 +71,7 @@ class v9fs(py9p.Server):
         if req.ifcall.mode & py9p.OTRUNC:
             f.seek(0)
             f.truncate()
+            f.commit()
         else:
             f.sync()
             f.open()
@@ -101,6 +109,8 @@ class v9fs(py9p.Server):
         f = self.storage.checkout(req.fid.qid.path)
         f.sync()
         r = inode2dir(f)
+        if f.mode == stat.S_IFLNK:
+            r.extension = f.getvalue()
         req.ofcall.stat.append(r)
         srv.respond(req, None)
 

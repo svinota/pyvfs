@@ -1,11 +1,10 @@
 .. PyVFS documentation master file, created by
    sphinx-quickstart on Mon Oct  1 17:45:10 2012.
 
-Welcome to PyVFS's documentation!
-=================================
+Python Virtual FS module
+========================
 
-.. note::
-    ... we're also surprised, that it works, you know.
+The project on github:  https://github.com/svinota/pyvfs
 
 PyVFS introduction
 ------------------
@@ -25,8 +24,8 @@ PyVFS does not support client authorization on 9p sockets.
 .. toctree::
     :maxdepth: 2
 
-    vfs_details
     vfs
+    vfs_details
 
 ObjectFS
 --------
@@ -58,7 +57,12 @@ decorate functions and/or objects you want to export::
     def MyFunction(arg1, arg2="default value", ...):
         ...
 
-Usage examples:
+By default, the library uses weak references to objects, that
+allows the Python garbage collector to work properly. All
+objects, that are not referenced anymore (except from the FS)
+will disappear from the FS as well.
+
+ObjectFS topics:
 
 .. toctree::
     :maxdepth: 2
@@ -66,11 +70,7 @@ Usage examples:
     first_steps
     second_steps
 
-By default, the library uses weak references to objects, that
-allows the Python garbage collector to work properly. All
-objects, that are not referenced anymore (except from the FS)
-will disappear from the FS as well.
-
+How to set up the FS export and mount it, read :ref:`vfs_details`
 
 Implementation and API
 ----------------------

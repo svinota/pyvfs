@@ -17,7 +17,7 @@
 # 	Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 version ?= "0.2"
-release ?= "0.2.5"
+release ?= "0.2.6"
 python ?= "python"
 
 ifdef root
@@ -42,7 +42,7 @@ check:
 		do pep8 $$i || exit 1; \
 		pyflakes $$i || exit 1; \
 		done
-	2to3 pyvfs
+	-2to3 pyvfs
 
 setup.py docs/conf.py:
 	gawk -v version=${version} -v release=${release} -v flavor=${flavor}\

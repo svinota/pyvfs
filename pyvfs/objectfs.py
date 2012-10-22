@@ -70,6 +70,12 @@ List.register(tuple)
 List.register(frozenset)
 
 
+String = ABCMeta("String", (object,), {})
+String.register(str)
+String.register(bytes)
+String.register(unicode)
+
+
 File = ABCMeta("File", (object,), {})
 File.register(bool)
 File.register(types.FileType)
@@ -117,7 +123,7 @@ def _dir(obj):
     if isinstance(obj, List):
         return [str(x) for x in range(len(obj))]
     elif isinstance(obj, dict):
-        return [x for x in list(obj.keys()) if isinstance(x, bytes)]
+        return [str(x) for x in list(obj.keys()) if isinstance(x, String)]
     else:
         return [x for x in dir(obj) if not x.startswith("_")]
 
@@ -137,7 +143,17 @@ def _get_name(obj):
         pass
 
     try:
-        return "%s [0x%x]" % (obj.__class__.__name__, id(obj))
+        obj_id = "0x%x" % (id(obj))
+        for i in ("key", "name", "id"):
+            try:
+                text = str(getattr(obj, i))
+                if text.find("/") == -1:
+                    obj_id = text
+                    break
+            except:
+                pass
+
+        return "%s [%s]" % (obj.__class__.__name__, obj_id)
     except:
         return "0x%x" % (id(obj))
 
@@ -194,6 +210,7 @@ class vInode(Inode):
             self.stack = self.parent.stack
         else:
             self.stack = {}
+        self.kwarg = kwarg
         self.root = root
         self.blacklist = None
         self.blacklist = kwarg.get("blacklist", None) or \
@@ -203,8 +220,8 @@ class vInode(Inode):
                 self.destroy()
                 raise Eperm()
         # force self.observe, bypass property setter
-        self.use_weakrefs = kwarg.get("weakref", True)
         self.__observe = None
+        cycle_detect = kwarg.get("cycle_detect", "symlink")
         # create the hook to the object only on the object root vInode
         try:
             if self.root:
@@ -212,16 +229,26 @@ class vInode(Inode):
                 self.stack[id(self.observe)] = self
             else:
                 # cycle links detection
-                if kwarg.get("cycle_detect", True):
+                if cycle_detect != "none" and self.mode & stat.S_IFDIR:
                     self._check_cycle()
+        except Eexist as e:
+            if cycle_detect == "symlink":
+                self.write(self.relative_path(e.target.absolute_path()))
+                e.target.cleanup[str(id(self))] = (
+                        self.storage.destroy, (self.path,))
+                self.mode = stat.S_IFLNK
+            else:
+                self.destroy()
+                raise e
         except Exception as e:
             self.destroy()
             raise e
-        if kwarg.get("cycle_detect", True):
-            self.cleanup["stack"] = (self.stack.pop, (id(self.observe),))
-        self.functions = kwarg.get("functions", False)
         if (self.mode & stat.S_IFDIR) and kwarg.get("repr", True):
             self.children[".repr"] = vRepr(".repr", self)
+
+    def relative_path(self, target):
+        to_root = [".."] * (len(self.absolute_path().split("/")) - 2)
+        return "%s%s" % ("/".join(to_root), target)
 
     def get_root(self):
         if self.root:
@@ -257,7 +284,7 @@ class vInode(Inode):
             # object and it breaks cycle reference detection
             #
             # this won't work: lambda x: self.storage.remove(self.path)
-            if not self.use_weakrefs:
+            if not self.kwarg.get("weakref", True):
                 raise Exception()
             wp = weakref.proxy(obj)
         except:
@@ -269,16 +296,15 @@ class vInode(Inode):
 
     def _check_cycle(self):
         try:
-            if not self.use_weakrefs:
+            if not self.kwarg.get("weakref", True):
                 raise Exception()
             self_id = id(weakref.proxy(self.observe))
         except:
             self_id = id(self.observe)
         if self_id in list(self.stack.keys()):
-            self.storage.remove(self.path)
-            raise Eexist("%s (%s)" % (self_id,
-                self.stack[self_id].absolute_path()))
+            raise Eexist(self.stack[self_id])
         self.stack[self_id] = self
+        self.cleanup["stack"] = (self.stack.pop, (id(self.observe),))
 
     def commit(self):
         """
@@ -320,6 +346,8 @@ class vInode(Inode):
                             if _get_name(k.observe) != i:
                                 k.name = _get_name(k.observe)
                 except:
+                    logging.debug("destroying %s" % (k.name))
+                    logging.debug("%s" % (k.cleanup))
                     k.destroy()
         else:
             chs = set(self.children.keys())
@@ -335,9 +363,7 @@ class vInode(Inode):
                 self.children[i].destroy()
             for i in to_create:
                 self.storage.create(name=i, parent=self,
-                        obj=_getattr(self.observe, i),
-                        functions=self.functions,
-                        weakref=self.use_weakrefs)
+                        obj=_getattr(self.observe, i), **self.kwarg)
 
 
 class vFunction(vInode):
@@ -350,16 +376,19 @@ class vFunction(vInode):
     """
 
     def __init__(self, *argv, **kwarg):
+        kwarg['cycle_detect'] = 'none'
+
         vInode.__init__(self, *argv, **kwarg)
         try:
             self.children["code"] = vFunctionCode("code", self,
-                    cycle_detect=False)
+                    cycle_detect="none")
             self.children["call"] = vFunctionCall("call", self,
-                    cycle_detect=False)
+                    cycle_detect="none")
             self.children["context"] = vFunctionContext("context", self,
-                    cycle_detect=False)
-        except:
+                    cycle_detect="none")
+        except Exception as e:
             self.destroy()
+            raise e
 
     def sync(self):
         pass
@@ -451,6 +480,8 @@ class vFunctionCall(vInode):
                 self.parent.get_args(skip=("self",)))))
 
     def commit(self):
+        if self.length == 0:
+            return
         self.called = True
         self.seek(0)
         config = SafeConfigParser()
@@ -499,7 +530,7 @@ class vFunctionContext(vInode):
 
     def open(self):
         new = vFunctionCall("call-%s" % (uuid.uuid4()), self.parent,
-                cycle_detect=False)
+                cycle_detect="none")
         self.parent.auto_names.append(new.name)
         self.seek(0)
         self.truncate()
@@ -601,13 +632,21 @@ class ObjectFS(Storage):
                 return
 
             try:
-                if isinstance(obj, Func) and kwarg.get("functions", False):
-                    new = vFunction(name, parent, obj=obj, **kwarg)
-                elif isinstance(obj, File):
-                    new = vLiteral(name, parent)
-                else:
-                    new = parent.create(name, mode=stat.S_IFDIR, obj=obj,
-                            **kwarg)
+                klass = Inode
+                mode = stat.S_IFREG
+                if len(kwarg.keys()) > 0:
+                    if isinstance(obj, Func) and \
+                            kwarg.get("functions", False):
+                        klass = vFunction
+                        mode = stat.S_IFDIR
+                    elif isinstance(obj, File):
+                        klass = vLiteral
+                        mode = stat.S_IFREG
+                    else:
+                        klass = vInode
+                        mode = stat.S_IFDIR
+                new = parent.create(name, klass=klass,
+                        mode=mode, obj=obj, **kwarg)
             except:
                 return
 
@@ -661,11 +700,24 @@ def export(*argv, **kwarg):
           False). When True, the files will contain disassembled function
           code.
         * **weakref** -- Use weak references to this object (default: True)
+        * **cycle_detect** -- The cycle reference detection mode. Can be:
+            * ``none`` -- No cycle detection, the FS will not try
+              to watch references to the object from existing inodes.
+              So, if the object (or one of its children) will have a
+              reference to itself, it will be represented on the FS
+              as a new subdirectory, and so forth to the infinity.
+            * ``symlink`` -- Inodes, referencing the same objects, as
+              an existing inode does, will be created as symlinks.
+              This is the default behaviour.
+            * ``drop`` -- Such inodes will not be created at all. If
+              you want your FS for some reason be searchable by
+              recursive grep, you should use this option.
     """
     basedir = kwarg.get("basedir", "").split("/")
     blacklist = kwarg.get("blacklist", [])
     functions = kwarg.get("functions", False)
     weakref = kwarg.get("weakref", True)
+    cycle_detect = kwarg.get("cycle_detect", "symlink")
 
     def wrap(c):
         global fs
@@ -677,7 +729,8 @@ def export(*argv, **kwarg):
                     try:
                         parent = parent.children[i]
                     except:
-                        parent = vInode(i, parent, mode=stat.S_IFDIR)
+                        parent = vInode(i, parent, mode=stat.S_IFDIR,
+                                cycle_detect="none")
             return parent
 
         if isinstance(c, types.FunctionType):
@@ -698,7 +751,7 @@ def export(*argv, **kwarg):
                 parent = create_basedir(basedir)
                 fs.create(name=None, root=True, parent=parent, obj=self,
                         blacklist=blacklist, functions=functions,
-                        weakref=weakref)
+                        weakref=weakref, cycle_detect=cycle_detect)
             c.__init__ = new_init
 
         return c
