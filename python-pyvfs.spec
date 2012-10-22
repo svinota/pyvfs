@@ -1,7 +1,8 @@
 %global pkgname pyvfs
+%global pypname objectfs
 
 Name: python-%{pkgname}
-Version: 0.2.5
+Version: 0.2.6
 Release: 1%{?dist}
 Summary: Simple python VFS library
 License: GPLv3+
@@ -10,7 +11,7 @@ URL: https://github.com/svinota/%{pkgname}
 
 BuildArch: noarch
 BuildRequires: python2-devel
-Source: http://peet.spb.ru/archives/%{pkgname}-%{version}.tar.gz
+Source: http://peet.spb.ru/archives/%{pypname}-%{version}.tar.gz
 
 %description
 PyVFS is a simple VFS library written in Python. It consists of
@@ -23,7 +24,7 @@ bundled applications, e.g. pyvfs.objectfs -- the library, that allows
 to represent Python objects as files.
 
 %prep
-%setup -q -n %{pkgname}-%{version}
+%setup -q -n %{pypname}-%{version}
 
 %build
 # nothing to build
@@ -34,8 +35,14 @@ to represent Python objects as files.
 %files
 %doc README* LICENSE
 %{python_sitelib}/%{pkgname}*
+%{python_sitelib}/%{pypname}*
 
 %changelog
+* Mon Oct 22 2012 Peter V. Saveliev <peet@redhat.com> 0.2.6-1
+- symlink support
+- truncate() fixed for objectfs
+- pypi support
+
 * Fri Oct 19 2012 Peter V. Saveliev <peet@redhat.com> 0.2.5-1
 - new cycle detection mechanism for objectfs
 - transaction-like cleanup for Inode class
