@@ -2,7 +2,7 @@
 
 from distutils.core import setup
 
-setup(name='pyvfs',
+setup(name='objectfs',
     version='@RELEASE@',
     description='Simple Python VFS module',
     author='Peter V. Saveliev',
