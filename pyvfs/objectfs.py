@@ -219,7 +219,7 @@ class vInode(Inode):
                 self.stack[id(self.observe)] = self
             else:
                 # cycle links detection
-                if cycle_detect != "none":
+                if cycle_detect != "none" and self.mode & stat.S_IFDIR:
                     self._check_cycle()
         except Eexist as e:
             if cycle_detect == "symlink":
