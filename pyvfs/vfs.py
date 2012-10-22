@@ -141,6 +141,8 @@ class Inode(BytesIO, object):
                 (self.parent != self) and\
                 (self != stop):
             return "%s/%s" % (self.parent.absolute_path(stop), self.name)
+        elif self.parent is None:
+            return "[ detached ]/%s" % (self.name)
         else:
             return ""
 
