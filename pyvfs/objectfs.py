@@ -717,7 +717,8 @@ def export(*argv, **kwarg):
                     try:
                         parent = parent.children[i]
                     except:
-                        parent = vInode(i, parent, mode=stat.S_IFDIR)
+                        parent = vInode(i, parent, mode=stat.S_IFDIR,
+                                cycle_detect="none")
             return parent
 
         if isinstance(c, types.FunctionType):
