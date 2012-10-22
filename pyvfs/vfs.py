@@ -13,6 +13,7 @@ import pwd
 import grp
 import threading
 import logging
+import traceback
 from io import BytesIO
 
 DEFAULT_DIR_MODE = 0o755
@@ -323,7 +324,11 @@ class Storage(object):
     def remove(self, target):
         with self.lock:
             f = self.checkout(target)
-            f.destroy()
+            try:
+                f.destroy()
+            except:
+                logging.debug("inode removal error: %s" % (
+                    traceback.format_exc()))
 
     def wstat(self, target, stat):
         with self.lock:
