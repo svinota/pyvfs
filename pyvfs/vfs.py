@@ -113,7 +113,7 @@ class Inode(BytesIO, object):
         self.__name = name
         if (self.parent != self) and (self.parent != None):
             self.parent.children[name] = self
-            self.cleanup["name"] = (self.parent.remove, (name,))
+            self.cleanup["name"] = (self.parent.remove, (self,))
         try:
             self._update_register()
         except Exception as e:
