@@ -29,6 +29,7 @@ to represent Python objects as files.
 %files
 %doc README* LICENSE
 %{python_sitelibdir}/pyvfs*
+%{python_sitelibdir}/objectfs*
 
 %changelog
 * Mon Oct 22 2012 Peter V. Saveliev <peet@altlinux.org> 0.2.6-alt2
