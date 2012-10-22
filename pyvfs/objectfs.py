@@ -364,16 +364,19 @@ class vFunction(vInode):
     """
 
     def __init__(self, *argv, **kwarg):
+        kwarg['cycle_detect'] = 'none'
+
         vInode.__init__(self, *argv, **kwarg)
         try:
             self.children["code"] = vFunctionCode("code", self,
-                    cycle_detect="drop")
+                    cycle_detect="none")
             self.children["call"] = vFunctionCall("call", self,
-                    cycle_detect="drop")
+                    cycle_detect="none")
             self.children["context"] = vFunctionContext("context", self,
-                    cycle_detect="drop")
-        except:
+                    cycle_detect="none")
+        except Exception as e:
             self.destroy()
+            raise e
 
     def sync(self):
         pass
@@ -513,7 +516,7 @@ class vFunctionContext(vInode):
 
     def open(self):
         new = vFunctionCall("call-%s" % (uuid.uuid4()), self.parent,
-                cycle_detect="drop")
+                cycle_detect="none")
         self.parent.auto_names.append(new.name)
         self.seek(0)
         self.truncate()
