@@ -346,6 +346,8 @@ class vInode(Inode):
                             if _get_name(k.observe) != i:
                                 k.name = _get_name(k.observe)
                 except:
+                    logging.debug("destroying %s" % (k.name))
+                    logging.debug("%s" % (k.cleanup))
                     k.destroy()
         else:
             chs = set(self.children.keys())
