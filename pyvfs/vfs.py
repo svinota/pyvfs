@@ -167,6 +167,11 @@ class Inode(BytesIO, object):
                 ret[i] = k[0](*argv, **kwarg)
             except Exception as e:
                 ret[i] = e
+        try:
+            name = self.name
+        except:
+            name = id(self)
+        logging.debug("[%s] destroy return: %s" % (name, ret))
         return ret
 
     def add(self, inode):
