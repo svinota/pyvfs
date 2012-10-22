@@ -70,6 +70,12 @@ List.register(tuple)
 List.register(frozenset)
 
 
+String = ABCMeta("String", (object,), {})
+String.register(str)
+String.register(bytes)
+String.register(unicode)
+
+
 File = ABCMeta("File", (object,), {})
 File.register(bool)
 File.register(types.FileType)
@@ -117,7 +123,7 @@ def _dir(obj):
     if isinstance(obj, List):
         return [str(x) for x in range(len(obj))]
     elif isinstance(obj, dict):
-        return [x for x in list(obj.keys()) if isinstance(x, bytes)]
+        return [str(x) for x in list(obj.keys()) if isinstance(x, String)]
     else:
         return [x for x in dir(obj) if not x.startswith("_")]
 
