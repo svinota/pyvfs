@@ -75,9 +75,6 @@ class Inode(BytesIO, object):
                 self.mode = stat.S_IFREG | DEFAULT_FILE_MODE
         # all is ok for this moment, so we can clean up
         # the transaction and create one exit hook
-        self.cleanup = {
-                "storage": (self.storage.destroy, (self.path,))
-                }
 
     def __hash__(self):
         return self.path
@@ -92,7 +89,7 @@ class Inode(BytesIO, object):
             pass
         self.path = int(abs(hash(self.absolute_path())))
         self.storage.register(self)
-        self.cleanup["storage"] = (self.storage.unregister, (self,))
+        self.cleanup["storage"] = (self.storage.destroy, (self.path,))
         for (i, k) in [x for x in list(self.children.items())
                 if x[0] not in (".", "..")]:
             k._update_register()
@@ -113,7 +110,6 @@ class Inode(BytesIO, object):
         self.__name = name
         if (self.parent != self) and (self.parent != None):
             self.parent.children[name] = self
-            self.cleanup["name"] = (self.parent.remove, (self,))
         try:
             self._update_register()
         except Exception as e:
