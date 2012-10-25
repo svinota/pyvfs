@@ -4,8 +4,6 @@
 Python Virtual FS module
 ========================
 
-The project on github:  https://github.com/svinota/pyvfs
-
 PyVFS introduction
 ------------------
 
@@ -79,6 +77,18 @@ Implementation and API
     :maxdepth: 2
 
     api
+
+Links
+=====
+
+ * home: https://github.com/svinota/pyvfs
+ * bugs: https://github.com/svinota/pyvfs/issues
+ * docs: http://peet.spb.ru/pyvfs/
+ * wiki: https://github.com/svinota/pyvfs/wiki
+ * pypi: http://pypi.python.org/pypi/objectfs/
+ * list: https://groups.google.com/forum/#!forum/pyvfs
+
+
 
 Indices and tables
 ==================
