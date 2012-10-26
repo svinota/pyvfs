@@ -46,6 +46,8 @@ Your script::
 
     # import server
     from pyvfs.utils import Server
+    # create it
+    srv = Server()
     # start it in foreground
     srv.run()
 
