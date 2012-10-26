@@ -96,15 +96,11 @@ class ffs(fuse.Fuse, object):
 
     @checkout
     def chmod(self, inode, mode):
-        inode.mode = mode | (inode.mode & \
-                (stat.S_IFREG | stat.S_IFDIR))
+        self.storage.chmod(inode, mode)
 
     @checkout
     def chown(self, inode, uid, gid):
-        if uid > -1:
-            inode.uidnum = uid
-        if gid > -1:
-            inode.gidnum = gid
+        self.storage.chown(inode, uid, gid)
 
     @checkout
     def open(self, inode, flags):
