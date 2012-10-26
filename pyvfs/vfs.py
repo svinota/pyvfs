@@ -200,27 +200,6 @@ class Inode(BytesIO, object):
         logging.debug("deprecated call Inode.rename() used")
         self.children[old_name].name = new_name
 
-    def wstat(self, stat):
-        # change uid?
-        if (stat.uidnum >> 16) != 0xFFFF:
-            self.uid = pwd.getpwuid(stat.uidnum).pw_name
-        else:
-            if stat.uid:
-                self.uid = stat.uid
-        # change gid?
-        if (stat.gidnum >> 16) != 0xFFFF:
-            self.gid = grp.getgrgid(stat.gidnum).gr_name
-        else:
-            if stat.gid:
-                self.gid = stat.gid
-        # change mode?
-        if stat.mode != 0xFFFFFFFF:
-            self.mode = ((self.mode & 0o7777) ^ self.mode) |\
-                    (stat.mode & 0o7777)
-        # change name?
-        if stat.name:
-            self.parent.rename(self.name, stat.name)
-
     @property
     def length(self):
         if self.mode & stat.S_IFDIR:
