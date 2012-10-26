@@ -20,7 +20,7 @@ with several transports: TCP/IP or UNIX socket. Right now
 PyVFS does not support client authorization on 9p sockets.
 
 .. toctree::
-    :maxdepth: 2
+    :maxdepth: 3
 
     vfs
     vfs_details
@@ -77,6 +77,14 @@ Implementation and API
     :maxdepth: 2
 
     api
+
+Miscellaneous topics
+====================
+
+.. toctree::
+    :maxdepth: 3
+
+    auth
 
 Links
 =====
