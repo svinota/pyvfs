@@ -39,7 +39,7 @@ def mode2plan(mode):
 
 def inode2dir(inode):
     return py9p.Dir(
-            dotu=0,
+            dotu=1,
             type=0,
             dev=0,
             qid=py9p.Qid((mode2plan(inode.mode) >> 24) & py9p.QTDIR, 0,
@@ -51,7 +51,21 @@ def inode2dir(inode):
             name=inode.name,
             uid=inode.uid,
             gid=inode.gid,
-            muid=inode.muid)
+            muid=inode.muid,
+            extension="",
+            uidnum=inode.uidnum,
+            gidnum=inode.gidnum,
+            muidnum=inode.muidnum)
+
+
+def checkout(c):
+    def wrapped(self, srv, req, *argv):
+        try:
+            inode = self.storage.checkout(req.fid.qid.path)
+            return c(self, srv, req, inode, *argv)
+        except:
+            srv.respond(req, None)
+    return wrapped
 
 # 8<-----------------------------------------------------------------------
 #
@@ -72,9 +86,9 @@ class v9fs(py9p.Server):
         self.storage = storage
         self.root = inode2dir(self.storage.root)
 
-    def create(self, srv, req):
-        f = self.storage.checkout(req.fid.qid.path)
-        new = self.storage.create(req.ifcall.name, f,
+    @checkout
+    def create(self, srv, req, inode):
+        new = self.storage.create(req.ifcall.name, inode,
             mode2stat(req.ifcall.perm))
         if new.mode == stat.S_IFLNK:
             new.write(req.ifcall.extension)
@@ -82,15 +96,15 @@ class v9fs(py9p.Server):
             new.path)
         srv.respond(req, None)
 
-    def open(self, srv, req):
-        f = self.storage.checkout(req.fid.qid.path)
+    @checkout
+    def open(self, srv, req, inode):
         if req.ifcall.mode & py9p.OTRUNC:
-            f.seek(0)
-            f.truncate()
-            f.commit()
+            inode.seek(0)
+            inode.truncate()
+            inode.commit()
         else:
-            f.sync()
-            f.open()
+            inode.sync()
+            inode.open()
         srv.respond(req, None)
 
     def walk(self, srv, req, fid=None):
@@ -114,52 +128,65 @@ class v9fs(py9p.Server):
         srv.respond(req, "file not found")
         return
 
-    def wstat(self, srv, req):
+    @checkout
+    def wstat(self, srv, req, inode):
 
-        self.storage.checkout(req.fid.qid.path)
-        s = req.ifcall.stat[0]
-        self.storage.wstat(req.fid.qid.path, s)
+        istat = req.ifcall.stat[0]
+        if (istat.uidnum >> 16) == 0xFFFF:
+            istat.uidnum = -1
+        if (istat.gidnum >> 16) == 0xFFFF:
+            istat.gidnum = -1
+        self.storage.chown(inode, istat.uidnum, istat.gidnum)
+        # change mode?
+        if istat.mode != 0xFFFFFFFF:
+            print oct(istat.mode)
+            self.storage.chmod(inode, mode2stat(istat.mode))
+        # change name?
+        if istat.name:
+            inode.parent.rename(inode.name, istat.name)
         srv.respond(req, None)
 
-    def stat(self, srv, req):
-        f = self.storage.checkout(req.fid.qid.path)
-        f.sync()
-        r = inode2dir(f)
-        if f.mode == stat.S_IFLNK:
-            r.extension = f.getvalue()
-        req.ofcall.stat.append(r)
+    @checkout
+    def stat(self, srv, req, inode):
+        inode.sync()
+        p9dir = inode2dir(inode)
+        if inode.mode == stat.S_IFLNK:
+            p9dir.extension = inode.getvalue()
+        req.ofcall.stat.append(p9dir)
         srv.respond(req, None)
 
-    def write(self, srv, req):
-        req.ofcall.count = self.storage.write(req.fid.qid.path,
+    @checkout
+    def write(self, srv, req, inode):
+        req.ofcall.count = self.storage.write(inode,
             req.ifcall.data, req.ifcall.offset)
         srv.respond(req, None)
 
-    def clunk(self, srv, req):
+    @checkout
+    def clunk(self, srv, req, inode):
         try:
-            self.storage.commit(req.fid.qid.path)
+            self.storage.commit(inode)
         except:
             pass
         srv.respond(req, None)
 
-    def remove(self, srv, req):
-        self.storage.remove(req.fid.qid.path)
+    @checkout
+    def remove(self, srv, req, inode):
+        self.storage.remove(inode)
         srv.respond(req, None)
 
-    def read(self, srv, req):
+    @checkout
+    def read(self, srv, req, inode):
 
-        f = self.storage.checkout(req.fid.qid.path)
-
-        if mode2plan(f.mode) & py9p.DMDIR:
-            f.sync()
+        if mode2plan(inode.mode) & py9p.DMDIR:
+            inode.sync()
             req.ofcall.stat = []
-            for (i, k) in list(f.children.items()):
+            for (i, k) in list(inode.children.items()):
                 if i not in (".", ".."):
                     req.ofcall.stat.append(inode2dir(k))
         else:
             if req.ifcall.offset == 0:
-                f.sync()
-            req.ofcall.data = self.storage.read(f.path, req.ifcall.count,
+                inode.sync()
+            req.ofcall.data = self.storage.read(inode, req.ifcall.count,
                 req.ifcall.offset)
             req.ofcall.count = len(req.ofcall.data)
 
