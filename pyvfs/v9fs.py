@@ -5,19 +5,35 @@ pyvfs.v9fs -- 9pfs connector
 9p2000 abstraction layer, is used to plug VFS into py9p
 """
 import stat
+import logging
 from py9p import py9p
+
+try:
+    assert hasattr(py9p, "DMSTICKY")
+except Exception as e:
+    logging.warning("""\n
+    incompatible py9p version
+    get the last here: https://github.com/svinota/py9p
+    """)
+    raise e
 
 
 def mode2stat(mode):
     return (mode & 0o777) |\
             ((mode & py9p.DMDIR) >> 17) |\
             ((mode & py9p.DMSYMLINK) >> 10) |\
-            ((mode & py9p.DMSYMLINK) >> 12)
+            ((mode & py9p.DMSYMLINK) >> 12) |\
+            ((mode & py9p.DMSETUID) >> 8) |\
+            ((mode & py9p.DMSETGID) >> 8) |\
+            ((mode & py9p.DMSTICKY) >> 7)
 
 
 def mode2plan(mode):
     return (mode & 0o777) | \
             ((mode & stat.S_IFDIR) << 17) |\
+            ((mode & stat.S_ISUID) << 8) |\
+            ((mode & stat.S_ISGID) << 8) |\
+            ((mode & stat.S_ISVTX) << 7) |\
             (int(mode == stat.S_IFLNK) << 25)
 
 
