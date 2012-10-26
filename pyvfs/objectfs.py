@@ -235,7 +235,7 @@ class vInode(Inode):
             if cycle_detect == "symlink":
                 self.write(self.relative_path(e.target.absolute_path()))
                 e.target.cleanup[str(id(self))] = (
-                        self.storage.destroy, (self.path,))
+                        self.storage.destroy, (self,))
                 self.mode = stat.S_IFLNK
             else:
                 self.destroy()
@@ -283,7 +283,7 @@ class vInode(Inode):
             # weakref to generate different proxies for one
             # object and it breaks cycle reference detection
             #
-            # this won't work: lambda x: self.storage.remove(self.path)
+            # this won't work: lambda x: self.storage.remove(self)
             if not self.kwarg.get("weakref", True):
                 raise Exception()
             wp = weakref.proxy(obj)

@@ -89,7 +89,7 @@ class Inode(BytesIO, object):
             pass
         self.path = int(abs(hash(self.absolute_path())))
         self.storage.register(self)
-        self.cleanup["storage"] = (self.storage.destroy, (self.path,))
+        self.cleanup["storage"] = (self.storage.destroy, (self,))
         for (i, k) in [x for x in list(self.children.items())
                 if x[0] not in (".", "..")]:
             k._update_register()
@@ -267,9 +267,8 @@ class Storage(object):
     def checkout(self, target):
         return self.files[target]
 
-    def reparent(self, target, inode, new_name=None):
+    def reparent(self, new_parent, inode, new_name=None):
         with self.lock:
-            new_parent = self.checkout(target)
             lookup = new_name or inode.name
             if lookup in list(new_parent.children.keys()):
                 raise Eexist()
@@ -278,45 +277,54 @@ class Storage(object):
                 inode.name = new_name
             new_parent.add(inode)
 
-    def commit(self, target):
+    def commit(self, inode):
         with self.lock:
-            f = self.checkout(target)
-            if f.writelock:
-                f.writelock = False
-                f.commit()
+            if inode.writelock:
+                inode.writelock = False
+                inode.commit()
 
-    def write(self, target, data, offset=0):
+    def write(self, inode, data, offset=0):
         with self.lock:
-            f = self.checkout(target)
-            f.writelock = True
-            f.seek(offset, os.SEEK_SET)
-            f.write(data)
+            inode.writelock = True
+            inode.seek(offset, os.SEEK_SET)
+            inode.write(data)
         return len(data)
 
-    def read(self, target, size, offset=0):
+    def read(self, inode, size, offset=0):
         with self.lock:
-            f = self.checkout(target)
             if offset == 0:
-                f.sync()
-            f.seek(offset, os.SEEK_SET)
-            data = f.read(size)
+                inode.sync()
+            inode.seek(offset, os.SEEK_SET)
+            data = inode.read(size)
         return data
 
-    def destroy(self, target):
+    def destroy(self, inode):
         with self.lock:
-            f = self.checkout(target)
-            for i, k in list(f.children.items()):
-                if i not in f.special_names:
+            for i, k in list(inode.children.items()):
+                if i not in inode.special_names:
                     self.remove(k.path)
-            f.parent.remove(f)
-            self.unregister(f)
+            inode.parent.remove(inode)
+            self.unregister(inode)
 
-    def remove(self, target):
+    def remove(self, inode):
         with self.lock:
-            f = self.checkout(target)
-            f.destroy()
+            inode.destroy()
 
-    def wstat(self, target, stat):
-        with self.lock:
-            f = self.checkout(target)
-            f.wstat(stat)
+    def chmod(self, inode, mode):
+        print oct(mode)
+        inode.mode = ((inode.mode & 0o7777) ^ inode.mode) |\
+                (mode & 0o7777)
+
+    def chown(self, inode, uid, gid):
+        if uid > -1:
+            try:
+                inode.uid = pwd.getpwuid(uid).pw_name
+            except:
+                inode.uid = ""
+            inode.uidnum = uid
+        if gid > -1:
+            try:
+                inode.gid = grp.getgrgid(gid).gr_name
+            except:
+                inode.gid = ""
+            inode.gidnum = gid
