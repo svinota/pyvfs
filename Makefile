@@ -40,7 +40,7 @@ clean:
 	make -C docs clean
 
 check:
-	for i in pyvfs examples tests; \
+	for i in pyvfs examples ; \
 		do pep8 $$i || exit 1; \
 		pyflakes $$i || exit 1; \
 		done
