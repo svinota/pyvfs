@@ -17,7 +17,7 @@
 # 	Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 version ?= "0.2"
-release ?= "0.2.6"
+release ?= "0.2.7"
 python ?= "python"
 
 ifdef root
@@ -38,7 +38,7 @@ clean:
 	make -C docs clean
 
 check:
-	for i in pyvfs examples tests; \
+	for i in pyvfs examples ; \
 		do pep8 $$i || exit 1; \
 		pyflakes $$i || exit 1; \
 		done

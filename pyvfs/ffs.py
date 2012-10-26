@@ -92,45 +92,36 @@ class ffs(fuse.Fuse, object):
 
     @checkout
     def flush(self, inode):
-        self.storage.commit(inode.path)
+        self.storage.commit(inode)
 
     @checkout
     def chmod(self, inode, mode):
-        inode.mode = mode | (inode.mode & \
-                (stat.S_IFREG | stat.S_IFDIR))
+        self.storage.chmod(inode, mode)
 
     @checkout
     def chown(self, inode, uid, gid):
-        if uid > -1:
-            inode.uidnum = uid
-        if gid > -1:
-            inode.gidnum = gid
+        self.storage.chown(inode, uid, gid)
 
     @checkout
     def open(self, inode, flags):
-        inode.sync()
-        inode.open()
+        self.storage.open(inode)
 
     @checkout
     def getattr(self, inode):
-        inode.sync()
+        self.storage.sync(inode)
         return fStat(inode)
 
     @checkout
     def read(self, inode, size, offset):
-        if offset == 0:
-            inode.sync()
-        return self.storage.read(inode.path, size, offset)
+        return self.storage.read(inode, size, offset)
 
     @checkout
     def write(self, inode, buf, offset):
-        return self.storage.write(inode.path, buf, offset)
+        return self.storage.write(inode, buf, offset)
 
     @checkout
     def truncate(self, inode, size):
-        inode.seek(size)
-        inode.truncate()
-        inode.commit()
+        self.storage.truncate(inode, size)
 
     @checkout
     def utime(self, inode, times):
@@ -140,7 +131,7 @@ class ffs(fuse.Fuse, object):
     @checkout
     def unlink(self, inode):
         try:
-            self.storage.remove(inode.path)
+            self.storage.remove(inode)
         except:
             return -errno.EPERM
 
@@ -152,7 +143,7 @@ class ffs(fuse.Fuse, object):
     def rename(self, inode, path):
         fname, parent = getParts(path)
         try:
-            self.storage.reparent(hash8(parent), inode, fname)
+            self.storage.reparent(parent, inode, fname)
         except:
             return -errno.EEXIST
 
