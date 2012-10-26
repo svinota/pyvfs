@@ -9,7 +9,7 @@ import ast
 import logging
 import threading
 from collections import deque
-from pyvfs.vfs import Inode
+from pyvfs.vfs import Inode, Storage
 
 protocols = []
 
@@ -107,14 +107,23 @@ class Server(threading.Thread):
 
     The typical code should look like that::
 
-        from pyvfs.vfs import Storage
         from pyvfs.utils import Server
 
-        server = Server(Storage())
+        server = Server()
         server.start()
 
     To run server in the backgroung, use ``start()``, in the
     foreground -- ``run()`` method.
+
+    If you want to use some custom storage, you can derive a
+    class from pyvfs.vfs.Storage, and use an instance of it
+    as an argument in the Server constructor::
+
+        from somewhere import CustomStorage
+        from pyvfs.utils import Server
+
+        server = Server(CustomStorage())
+        server.start()
     """
     parser = {
             "proto": "9p",
@@ -129,11 +138,11 @@ class Server(threading.Thread):
             "keyfiles": {},
             }
 
-    def __init__(self, fs):
+    def __init__(self, fs=None):
         threading.Thread.__init__(self,
                 name="PyVFS for ObjectFS at 0x%x" % (id(fs)))
         self.setDaemon(True)
-        self.fs = fs
+        self.fs = fs or Storage()
         for (i, k) in list(self.parser.items()):
             value = os.environ.get("PYVFS_%s" % (i.upper()), str(k))
             if isinstance(k, bool):
