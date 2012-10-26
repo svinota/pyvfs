@@ -99,12 +99,9 @@ class v9fs(py9p.Server):
     @checkout
     def open(self, srv, req, inode):
         if req.ifcall.mode & py9p.OTRUNC:
-            inode.seek(0)
-            inode.truncate()
-            inode.commit()
+            self.storage.truncate(inode)
         else:
-            inode.sync()
-            inode.open()
+            self.storage.open(inode)
         srv.respond(req, None)
 
     def walk(self, srv, req, fid=None):
@@ -148,7 +145,7 @@ class v9fs(py9p.Server):
 
     @checkout
     def stat(self, srv, req, inode):
-        inode.sync()
+        self.storage.sync(inode)
         p9dir = inode2dir(inode)
         if inode.mode == stat.S_IFLNK:
             p9dir.extension = inode.getvalue()
@@ -177,15 +174,15 @@ class v9fs(py9p.Server):
     @checkout
     def read(self, srv, req, inode):
 
+        if req.ifcall.offset == 0:
+            self.storage.sync(inode)
+
         if mode2plan(inode.mode) & py9p.DMDIR:
-            inode.sync()
             req.ofcall.stat = []
             for (i, k) in list(inode.children.items()):
                 if i not in (".", ".."):
                     req.ofcall.stat.append(inode2dir(k))
         else:
-            if req.ifcall.offset == 0:
-                inode.sync()
             req.ofcall.data = self.storage.read(inode, req.ifcall.count,
                 req.ifcall.offset)
             req.ofcall.count = len(req.ofcall.data)

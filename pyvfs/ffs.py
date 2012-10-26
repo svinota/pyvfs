@@ -104,18 +104,15 @@ class ffs(fuse.Fuse, object):
 
     @checkout
     def open(self, inode, flags):
-        inode.sync()
-        inode.open()
+        self.storage.open(inode)
 
     @checkout
     def getattr(self, inode):
-        inode.sync()
+        self.storage.sync(inode)
         return fStat(inode)
 
     @checkout
     def read(self, inode, size, offset):
-        if offset == 0:
-            inode.sync()
         return self.storage.read(inode, size, offset)
 
     @checkout
@@ -124,9 +121,7 @@ class ffs(fuse.Fuse, object):
 
     @checkout
     def truncate(self, inode, size):
-        inode.seek(size)
-        inode.truncate()
-        inode.commit()
+        self.storage.truncate(inode, size)
 
     @checkout
     def utime(self, inode, times):

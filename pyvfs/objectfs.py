@@ -40,7 +40,7 @@ import traceback
 import inspect
 import uuid
 from abc import ABCMeta
-from pyvfs.vfs import Storage, Inode, Eexist, Eperm
+from pyvfs.vfs import Storage, Inode, Eexist, Eperm, restrict
 from pyvfs.utils import Server
 from ConfigParser import SafeConfigParser
 
@@ -306,6 +306,7 @@ class vInode(Inode):
         self.stack[self_id] = self
         self.cleanup["stack"] = (self.stack.pop, (id(self.observe),))
 
+    @restrict
     def commit(self):
         """
         Write data back from the I/O buffer to the corresponding
@@ -328,6 +329,7 @@ class vInode(Inode):
                 logging.debug("[%s] commit() failed: %s" % (
                     self.path, str(e)))
 
+    @restrict
     def sync(self):
         """
         Synchronize directory subtree with the object's state.

@@ -13,6 +13,8 @@ import pwd
 import grp
 import threading
 import logging
+import inspect
+import traceback
 from io import BytesIO
 
 DEFAULT_DIR_MODE = 0o755
@@ -31,6 +33,24 @@ class Eexist(Exception):
 
 class Edebug(Exception):
     pass
+
+
+def restrict(c):
+    def wrapped(*argv, **kwarg):
+        stack = inspect.stack()
+        try:
+            caller = stack[1][0].f_locals['self']
+            line = stack[1][0].f_code.co_firstlineno
+            assert isinstance(caller, Storage) or\
+                    isinstance(caller, Inode)
+        except AssertionError:
+            logging.warning("Inode method %s called from: %s:%s" %\
+                    (c, caller, line))
+        except:
+            logging.error("Got error while analyzing stack: %s" %\
+                    (traceback.format_exc()))
+        return c(*argv, **kwarg)
+    return wrapped
 
 
 class Inode(BytesIO, object):
@@ -131,6 +151,7 @@ class Inode(BytesIO, object):
             return True
         return self.parent.orphaned
 
+    @restrict
     def absolute_path(self, stop=None):
         if (self.parent is not None) and\
                 (self.parent != self) and\
@@ -139,15 +160,19 @@ class Inode(BytesIO, object):
         else:
             return ""
 
+    @restrict
     def commit(self):
         pass
 
+    @restrict
     def sync(self):
         pass
 
+    @restrict
     def open(self):
         pass
 
+    @restrict
     def destroy(self):
         ret = {}
         for (i, k) in list(self.cleanup.items()):
@@ -163,8 +188,10 @@ class Inode(BytesIO, object):
                 ret[i] = k[0](*argv, **kwarg)
             except Exception as e:
                 ret[i] = e
+        logging.debug("destroy returned: %s" % (ret))
         return ret
 
+    @restrict
     def add(self, inode):
         if inode.name in list(self.children.keys()):
             raise Eexist()
@@ -173,6 +200,7 @@ class Inode(BytesIO, object):
         inode.storage = self.storage
         inode._update_register()
 
+    @restrict
     def remove(self, inode):
         """
         Remove a child from a directory
@@ -181,6 +209,7 @@ class Inode(BytesIO, object):
         inode.parent = None
         del self.children[inode.name]
 
+    @restrict
     def create(self, name, mode=0, klass=None, **kwarg):
         """
         Create a child in a directory
@@ -192,6 +221,7 @@ class Inode(BytesIO, object):
             storage=self.storage, **kwarg)
         return self.children[name]
 
+    @restrict
     def rename(self, old_name, new_name):
         """
         Rename a child
@@ -256,6 +286,21 @@ class Storage(object):
                 inode.name = new_name
             new_parent.add(inode)
 
+    def truncate(self, inode, size=0):
+        with self.lock:
+            inode.seek(size)
+            inode.truncate()
+            inode.commit()
+
+    def open(self, inode):
+        with self.lock:
+            inode.sync()
+            inode.open()
+
+    def sync(self, inode):
+        with self.lock:
+            inode.sync()
+
     def commit(self, inode):
         with self.lock:
             if inode.writelock:
@@ -281,7 +326,7 @@ class Storage(object):
         with self.lock:
             for i, k in list(inode.children.items()):
                 if i not in inode.special_names:
-                    self.remove(k.path)
+                    self.remove(k)
             inode.parent.remove(inode)
             self.unregister(inode)
 
