@@ -92,7 +92,7 @@ class ffs(fuse.Fuse, object):
 
     @checkout
     def flush(self, inode):
-        self.storage.commit(inode.path)
+        self.storage.commit(inode)
 
     @checkout
     def chmod(self, inode, mode):
@@ -120,11 +120,11 @@ class ffs(fuse.Fuse, object):
     def read(self, inode, size, offset):
         if offset == 0:
             inode.sync()
-        return self.storage.read(inode.path, size, offset)
+        return self.storage.read(inode, size, offset)
 
     @checkout
     def write(self, inode, buf, offset):
-        return self.storage.write(inode.path, buf, offset)
+        return self.storage.write(inode, buf, offset)
 
     @checkout
     def truncate(self, inode, size):
@@ -140,7 +140,7 @@ class ffs(fuse.Fuse, object):
     @checkout
     def unlink(self, inode):
         try:
-            self.storage.remove(inode.path)
+            self.storage.remove(inode)
         except:
             return -errno.EPERM
 
@@ -152,7 +152,7 @@ class ffs(fuse.Fuse, object):
     def rename(self, inode, path):
         fname, parent = getParts(path)
         try:
-            self.storage.reparent(hash8(parent), inode, fname)
+            self.storage.reparent(parent, inode, fname)
         except:
             return -errno.EEXIST
 
