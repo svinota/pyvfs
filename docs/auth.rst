@@ -39,12 +39,12 @@ socket. Created UNIX-socket can have access rights that prevent
 unauthorized access::
 
     export PYVFS_ADDRESS=/tmp/socket
+    export PYVFS_PORT=660
     python my_script.py &>/dev/null &
-    chmod 660 /tmp/socket
-    chgrp wheel /tmp/socket
 
-To mount the FS with usual system mount, you have to set up ``trans``
-option::
+Please note, that with UNIX sockets **PYVFS_PORT** means file
+access mode. To mount the FS with usual system mount, you have to
+set up ``trans`` option::
 
     mount -t 9p -o trans=unix /tmp/socket /mnt
 
@@ -73,7 +73,7 @@ locations, use **PYVFS_KEYFILES** dictionary::
     export PYVFS_KEYFILES='{"admin": "/etc/pki/admin_key.pub"}'
 
     ... on the client side:
-    cl.py -m pki -k /root/admin_key.priv admin@127.0.0.1:10001
+    fuse9p -c pki -k /root/admin_key.priv admin@127.0.0.1:10001
  
 .. note::
     Linux kernel v9fs implementation does not support nor pki,

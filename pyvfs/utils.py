@@ -92,13 +92,22 @@ class Server(threading.Thread):
     the behaviour with environment variables:
 
      * **PYVFS_PROTO** -- ``9p`` (default) or ``fuse``
-     * **PYVFS_PORT** -- tcp port; UNIX sockets are not supported
-       by now, but they are planned (9p only, default: 10001)
+     * **PYVFS_PORT** -- tcp port for TCP sockets and access mode
+       for UNIX sockets (9p only, default: 10001)
      * **PYVFS_ADDRESS** -- IPv4 address, use 0.0.0.0 to allow
        public access (9p only, default: 127.0.0.1)
      * **PYVFS_MOUNTPOINT** -- the mountpoint (fuse only, default: ./mnt)
      * **PYVFS_DEBUG** -- turn on stderr debug output of the FS protocol
      * **PYVFS_LOG** -- create /log inode
+     * **PYVFS_ALLOW_ROOT** -- allow root to access the mountpoint (fuse
+       only, default: False)
+     * **PYVFS_ALLOW_OTHER** -- allow other users to access the
+       mountpoint, requires ``user_allow_other`` in ``/etc/fuse.conf``
+       (fuse only, default: False)
+     * **AUTHMODE** -- authentication mode for 9p, can be ``pki``
+       (9p only, default: none)
+     * **KEYFILES** -- map of user public key files
+       (9p only, default: none)
 
     .. warning::
         No authentication for 9p is used in this library yet.
