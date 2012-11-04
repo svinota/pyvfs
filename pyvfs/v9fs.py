@@ -117,7 +117,7 @@ class v9fs(py9p.Server):
                 req.ofcall.wqid.append(qid)
                 if len(req.ifcall.wname) > 1:
                     req.ifcall.wname.pop(0)
-                    self.walk(srv, req, k)
+                    self.walk(srv, req, inode2dir(k))
                 else:
                     srv.respond(req, None)
                 return
