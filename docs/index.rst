@@ -4,8 +4,6 @@
 Python Virtual FS module
 ========================
 
-The project on github:  https://github.com/svinota/pyvfs
-
 PyVFS introduction
 ------------------
 
@@ -22,7 +20,7 @@ with several transports: TCP/IP or UNIX socket. Right now
 PyVFS does not support client authorization on 9p sockets.
 
 .. toctree::
-    :maxdepth: 2
+    :maxdepth: 3
 
     vfs
     vfs_details
@@ -79,6 +77,26 @@ Implementation and API
     :maxdepth: 2
 
     api
+
+Miscellaneous topics
+====================
+
+.. toctree::
+    :maxdepth: 3
+
+    auth
+
+Links
+=====
+
+ * home: https://github.com/svinota/pyvfs
+ * bugs: https://github.com/svinota/pyvfs/issues
+ * docs: http://peet.spb.ru/pyvfs/
+ * wiki: https://github.com/svinota/pyvfs/wiki
+ * pypi: http://pypi.python.org/pypi/objectfs/
+ * list: https://groups.google.com/forum/#!forum/pyvfs
+
+
 
 Indices and tables
 ==================

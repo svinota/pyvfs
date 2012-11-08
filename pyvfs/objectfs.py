@@ -40,7 +40,7 @@ import traceback
 import inspect
 import uuid
 from abc import ABCMeta
-from pyvfs.vfs import Storage, Inode, Eexist, Eperm
+from pyvfs.vfs import Storage, Inode, Eexist, Eperm, restrict
 from pyvfs.utils import Server
 from ConfigParser import SafeConfigParser
 
@@ -235,7 +235,7 @@ class vInode(Inode):
             if cycle_detect == "symlink":
                 self.write(self.relative_path(e.target.absolute_path()))
                 e.target.cleanup[str(id(self))] = (
-                        self.storage.destroy, (self.path,))
+                        self.storage.destroy, (self,))
                 self.mode = stat.S_IFLNK
             else:
                 self.destroy()
@@ -283,7 +283,7 @@ class vInode(Inode):
             # weakref to generate different proxies for one
             # object and it breaks cycle reference detection
             #
-            # this won't work: lambda x: self.storage.remove(self.path)
+            # this won't work: lambda x: self.storage.remove(self)
             if not self.kwarg.get("weakref", True):
                 raise Exception()
             wp = weakref.proxy(obj)
@@ -306,6 +306,7 @@ class vInode(Inode):
         self.stack[self_id] = self
         self.cleanup["stack"] = (self.stack.pop, (id(self.observe),))
 
+    @restrict
     def commit(self):
         """
         Write data back from the I/O buffer to the corresponding
@@ -328,6 +329,7 @@ class vInode(Inode):
                 logging.debug("[%s] commit() failed: %s" % (
                     self.path, str(e)))
 
+    @restrict
     def sync(self):
         """
         Synchronize directory subtree with the object's state.

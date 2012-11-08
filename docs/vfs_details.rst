@@ -3,6 +3,8 @@
 PyVFS protocols setup
 ---------------------
 
+See also: :ref:`auth`
+
 How you can access your filesystem, depends on the environment
 variables. To set them up, you can use shell, or directly
 modify ``os.environ`` dictionary prior to starting the server.
@@ -18,14 +20,19 @@ Protocol 9p
 
 Environment variables to use with 9p:
 
-    * **PYVFS_PROTO** -- should be set to ``9p`` (it is the default)
     * **PYVFS_ADDRESS** -- IPv4 address to listen on (default: 127.0.0.1),
       or UNIX socket path, e.g. /tmp/my_vfs
-    * **PYVFS_PORT** -- TCP port (default: 10001)
+    * **PYVFS_AUTHMODE** -- if set, should be ``pki`` (default: None),
+      see **PYVFS_KEYFILES** also
     * **PYVFS_DEBUG** -- switch the debug output [True/False]
       (default: False)
+    * **PYVFS_KEYFILES** -- dictionary of private keys, used for
+      ``pki`` authentication, e.g.: ``'{"admin": "/etc/pki/admin.pub"}'``
+      (default: Empty)
     * **PYVFS_LOG** -- create /log file and logging handler [True/False]
       (default: False)
+    * **PYVFS_PORT** -- TCP port (default: 10001)
+    * **PYVFS_PROTO** -- should be set to ``9p`` (it is the default)
 
 Bash script sample::
 
@@ -44,11 +51,14 @@ Protocol FUSE
 
 Environment variables:
 
-    * **PYVFS_PROTO** -- should be set to ``fuse``
-    * **PYVFS_MOUNTPOINT** -- the mountpoint with r/w access
-      (default: ./mnt)
+    * **PYVFS_ALLOW_ROOT** -- allow root access to the mountpoint
+    * **PYVFS_ALLOW_OTHER** -- allow other users access to the
+      mountpoint
     * **PYVFS_DEBUG** -- the same as for ``9p``
     * **PYVFS_LOG** -- the same as for ``9p``
+    * **PYVFS_MOUNTPOINT** -- the mountpoint with r/w access
+      (default: ./mnt)
+    * **PYVFS_PROTO** -- should be set to ``fuse``
 
 Bash script sample::
 
