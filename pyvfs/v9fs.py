@@ -108,7 +108,7 @@ class v9fs(py9p.Server):
 
         fd = fid or req.fid
         f = self.storage.checkout(fd.qid.path)
-        f.sync()
+        self.storage.sync(f)
 
         for (i, k) in list(f.children.items()):
             if req.ifcall.wname[0] == i:
