@@ -181,6 +181,7 @@ class v9fs(py9p.Server):
             req.ofcall.stat = []
             for (i, k) in list(inode.children.items()):
                 if i not in (".", ".."):
+                    self.storage.sync(k)
                     req.ofcall.stat.append(inode2dir(k))
         else:
             req.ofcall.data = self.storage.read(inode, req.ifcall.count,
