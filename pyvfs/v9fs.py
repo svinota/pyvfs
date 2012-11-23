@@ -136,7 +136,6 @@ class v9fs(py9p.Server):
         self.storage.chown(inode, istat.uidnum, istat.gidnum)
         # change mode?
         if istat.mode != 0xFFFFFFFF:
-            print oct(istat.mode)
             self.storage.chmod(inode, mode2stat(istat.mode))
         # change name?
         if istat.name:
