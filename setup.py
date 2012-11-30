@@ -3,7 +3,7 @@
 from distutils.core import setup
 
 setup(name='objectfs',
-    version='0.2.7',
+    version='0.2.8',
     description='Simple Python VFS module',
     author='Peter V. Saveliev',
     author_email='peet@redhat.com',
@@ -46,6 +46,8 @@ Your script::
 
     # import server
     from pyvfs.utils import Server
+    # create it
+    srv = Server()
     # start it in foreground
     srv.run()
 
@@ -104,6 +106,11 @@ Links
 
 Changes
 =======
+
+0.2.8 -- Paleoarchean
+---------------------
+
+ * directory listing fixes
 
 0.2.7 -- Eoarchaean
 -------------------
