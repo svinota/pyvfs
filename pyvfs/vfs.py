@@ -35,7 +35,7 @@ class Edebug(Exception):
     pass
 
 
-def restrict(c):
+def _restrict_debug(c):
     def wrapped(*argv, **kwarg):
         stack = inspect.stack()
         try:
@@ -51,6 +51,17 @@ def restrict(c):
                     (traceback.format_exc()))
         return c(*argv, **kwarg)
     return wrapped
+
+
+def _restrict_bypass(c):
+    return c
+
+
+if os.environ.get("PYVFS_LOG", "False").lower() in (
+        "yes", "true", "on", "t", "1"):
+    restrict = _restrict_debug
+else:
+    restrict = _restrict_bypass
 
 
 class Inode(BytesIO, object):
