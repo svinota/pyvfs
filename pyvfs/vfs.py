@@ -335,7 +335,6 @@ class Storage(object):
             inode.destroy()
 
     def chmod(self, inode, mode):
-        print oct(mode)
         inode.mode = ((inode.mode & 0o7777) ^ inode.mode) |\
                 (mode & 0o7777)
 

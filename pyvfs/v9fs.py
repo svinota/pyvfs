@@ -108,7 +108,7 @@ class v9fs(py9p.Server):
 
         fd = fid or req.fid
         f = self.storage.checkout(fd.qid.path)
-        f.sync()
+        self.storage.sync(f)
 
         for (i, k) in list(f.children.items()):
             if req.ifcall.wname[0] == i:
@@ -136,7 +136,6 @@ class v9fs(py9p.Server):
         self.storage.chown(inode, istat.uidnum, istat.gidnum)
         # change mode?
         if istat.mode != 0xFFFFFFFF:
-            print oct(istat.mode)
             self.storage.chmod(inode, mode2stat(istat.mode))
         # change name?
         if istat.name:
@@ -181,6 +180,7 @@ class v9fs(py9p.Server):
             req.ofcall.stat = []
             for (i, k) in list(inode.children.items()):
                 if i not in (".", ".."):
+                    self.storage.sync(k)
                     req.ofcall.stat.append(inode2dir(k))
         else:
             req.ofcall.data = self.storage.read(inode, req.ifcall.count,
