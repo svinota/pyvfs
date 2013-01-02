@@ -589,9 +589,12 @@ class vLiteral(vInode):
         self.seek(0)
         self.truncate()
         try:
-            self.write(str(self.observe))
+            if isinstance(self.observe, unicode):
+                self.write(bytes(self.observe.encode('utf-8')))
+            else:
+                self.write(bytes(self.observe))
         except:
-            pass
+            self.write(traceback.format_exc())
 
 
 class ObjectFS(Storage):
