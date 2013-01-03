@@ -32,10 +32,8 @@ endif
 all:
 	@echo targets: dist, install
 
-clean:
+clean: clean-version
 	rm -rf dist build MANIFEST
-	rm -f setup.py
-	rm -f docs/conf.py
 	find . -name "*pyc" -exec rm -f "{}" \;
 	make -C docs clean
 
@@ -50,14 +48,23 @@ setup.py docs/conf.py:
 	gawk -v version=${version} -v release=${release} -v flavor=${flavor}\
 		-f configure.gawk $@.in >$@
 
+clean-version:
+	rm -f setup.py
+	rm -f docs/conf.py
+
+force-version: clean-version update-version
+
 update-version: setup.py docs/conf.py
 
-docs: clean update-version
+docs: clean force-version
 	make -C docs html
 
-dist: clean update-version
+upload: clean force-version                                                      
+	${python} setup.py sdist upload 
+
+dist: clean force-version
 	${python} setup.py sdist
 
-install: clean update-version
+install: clean force-version
 	${python} setup.py install ${root} ${lib}
 
