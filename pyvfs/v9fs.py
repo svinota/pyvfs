@@ -129,8 +129,6 @@ class v9fs(py9p.Server):
     def stat(self, srv, req, inode):
         self.storage.sync(inode)
         p9dir = inode2dir(inode)
-        if inode.mode == stat.S_IFLNK:
-            p9dir.extension = inode.getvalue()
         req.ofcall.stat.append(p9dir)
         srv.respond(req, None)
 

@@ -131,7 +131,7 @@ class Inode(BytesIO, object):
     def _set_name(self, name):
         self._check_special(name)
         try:
-            if name in list(self.parent.children.keys()):
+            if name in self.parent.children:
                 raise Eexist(self.parent.children[name])
             del self.parent.children[self.name]
         except Eexist as e:
@@ -204,7 +204,7 @@ class Inode(BytesIO, object):
 
     @restrict
     def add(self, inode):
-        if inode.name in list(self.children.keys()):
+        if inode.name in self.children:
             raise Eexist()
         self.children[inode.name] = inode
         inode.parent = self
@@ -290,7 +290,7 @@ class Storage(object):
     def reparent(self, new_parent, inode, new_name=None):
         with self.lock:
             lookup = new_name or inode.name
-            if lookup in list(new_parent.children.keys()):
+            if lookup in new_parent.children:
                 raise Eexist()
             inode.parent.remove(inode)
             if new_name:

@@ -308,7 +308,7 @@ class vInode(Inode):
             self_id = id(weakref.proxy(self.observe))
         except:
             self_id = id(self.observe)
-        if self_id in list(self.stack.keys()):
+        if self_id in self.stack:
             raise Eexist(self.stack[self_id])
         self.stack[self_id] = self
         self.cleanup["stack"] = (self.stack.pop, (id(self.observe),))

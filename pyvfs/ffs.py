@@ -150,7 +150,7 @@ class ffs(fuse.Fuse, object):
     def readdir(self, path, offset):
         try:
             f = self.storage.checkout(hash8(path))
-            for i in list(f.children.keys()):
+            for i in f.children:
                 yield fuse.Direntry(i)
 
         except:
