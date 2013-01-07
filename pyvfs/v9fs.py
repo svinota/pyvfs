@@ -31,11 +31,11 @@ def inode2dir(inode):
             atime=inode.atime,
             mtime=inode.mtime,
             length=inode.length,
-            name=inode.name,
-            uid=inode.uid,
-            gid=inode.gid,
-            muid=inode.muid,
-            extension="",
+            name=bytes(inode.name.encode('utf-8')),
+            uid=bytes(inode.uid.encode('utf-8')),
+            gid=bytes(inode.gid.encode('utf-8')),
+            muid=bytes(inode.muid.encode('utf-8')),
+            extension=inode.getvalue() if inode.mode == stat.S_IFLNK else b'',
             uidnum=inode.uidnum,
             gidnum=inode.gidnum,
             muidnum=inode.muidnum)
@@ -65,7 +65,7 @@ class v9fs(py9p.Server):
     """
 
     def __init__(self, storage):
-        self.mountpoint = '/'
+        self.mountpoint = b'/'
         self.storage = storage
         self.root = inode2dir(self.storage.root)
 
@@ -74,7 +74,7 @@ class v9fs(py9p.Server):
         new = self.storage.create(req.ifcall.name, inode,
             py9p.mode2stat(req.ifcall.perm))
         if new.mode == stat.S_IFLNK:
-            new.write(req.ifcall.extension)
+            new.write(bytes(req.ifcall.extension.encode('utf-8')))
         req.ofcall.qid = py9p.Qid((req.ifcall.perm >> 24) & py9p.QTDIR, 0,
             new.path)
         srv.respond(req, None)
@@ -122,7 +122,7 @@ class v9fs(py9p.Server):
             self.storage.chmod(inode, py9p.mode2stat(istat.mode))
         # change name?
         if istat.name:
-            inode.parent.rename(inode.name, istat.name)
+            inode.parent.rename(inode.name, istat.name.decode('utf-8'))
         srv.respond(req, None)
 
     @checkout
