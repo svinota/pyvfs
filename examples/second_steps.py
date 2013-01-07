@@ -6,6 +6,12 @@ Simple PyVFS example
 # start PyVFS thread and import the decorator
 from pyvfs.objectfs import export
 
+# Python3 support
+import sys
+if sys.version_info[0] > 2:
+    def raw_input(s):
+        return input(s)
+
 
 # export all objects of the Example class
 # do not export "boo" atributes (see Child class)
