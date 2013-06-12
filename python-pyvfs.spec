@@ -2,10 +2,10 @@
 %global pypname objectfs
 
 Name: python-%{pkgname}
-Version: 0.2.6
+Version: 0.2.10
 Release: 1%{?dist}
 Summary: Simple python VFS library
-License: GPLv3+
+License: GPLv2+
 Group: Development/Languages
 URL: https://github.com/svinota/%{pkgname}
 
@@ -38,6 +38,11 @@ to represent Python objects as files.
 %{python_sitelib}/%{pypname}*
 
 %changelog
+* Wed Jun 12 2013 Peter V. Saveliev <peet@redhat.com> 0.2.10-1
+- Python 3 compatibility issues
+- unicode literals fixed
+- license changed from GPLv3+ to GPLv2+
+
 * Mon Oct 22 2012 Peter V. Saveliev <peet@redhat.com> 0.2.6-1
 - symlink support
 - truncate() fixed for objectfs
