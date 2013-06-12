@@ -52,8 +52,12 @@ clean-version:
 	rm -f setup.py
 	rm -f docs/conf.py
 
-upload: clean force-version                                                      
-	${python} setup.py sdist upload 
+force-version: clean-version update-version
+
+update-version: setup.py docs/conf.py
+
+upload: clean force-version
+	${python} setup.py sdist upload
 
 dist: clean force-version
 	${python} setup.py sdist
