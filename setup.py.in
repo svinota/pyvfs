@@ -8,12 +8,12 @@ setup(name='objectfs',
     author='Peter V. Saveliev',
     author_email='peet@redhat.com',
     url='https://github.com/svinota/pyvfs',
-    license='GPLv3+',
+    license='GPLv2+',
     packages=[
         'pyvfs'
         ],
     classifiers=[
-        'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)',
+        'License :: OSI Approved :: GNU General Public License v2 or later (GPLv2+)',
         'Programming Language :: Python',
         'Topic :: Software Development :: Libraries :: Python Modules',
         'Operating System :: POSIX',
@@ -106,6 +106,11 @@ Links
 
 Changes
 =======
+0.2.10
+------
+
+ * license changed from GPLv3+ to GPLv2+
+ * Python 3 compatibility issues
 
 0.2.9 -- Mesoarchean
 --------------------
