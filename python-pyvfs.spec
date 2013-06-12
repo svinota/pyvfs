@@ -43,6 +43,12 @@ to represent Python objects as files.
 - unicode literals fixed
 - license changed from GPLv3+ to GPLv2+
 
+* Thu Feb 14 2013 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 0.2.7-2
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_19_Mass_Rebuild
+
+* Thu Nov 08 2012 Peter V. Saveliev <peet@redhat.com> 0.2.7-1
+- support PKI authentication
+
 * Mon Oct 22 2012 Peter V. Saveliev <peet@redhat.com> 0.2.6-1
 - symlink support
 - truncate() fixed for objectfs
