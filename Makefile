@@ -17,7 +17,7 @@
 # 	Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 version ?= "0.2"
-release ?= "0.2.7"
+release ?= "0.2.9"
 python ?= "python"
 
 ifdef root
@@ -32,7 +32,7 @@ endif
 all:
 	@echo targets: dist, install
 
-clean:
+clean: clean-version
 	rm -rf dist build MANIFEST
 	find . -name "*pyc" -exec rm -f "{}" \;
 	make -C docs clean
@@ -52,12 +52,8 @@ clean-version:
 	rm -f setup.py
 	rm -f docs/conf.py
 
-update-version: setup.py docs/conf.py
-
-force-version: clean-version update-version
-
-docs: clean force-version
-	make -C docs html
+upload: clean force-version                                                      
+	${python} setup.py sdist upload 
 
 dist: clean force-version
 	${python} setup.py sdist

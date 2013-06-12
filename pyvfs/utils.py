@@ -167,7 +167,7 @@ class Server(threading.Thread):
         for i in list(self.protocols.keys()):
             if i not in protocols:
                 del self.protocols[i]
-        if self.proto not in list(self.protocols.keys()):
+        if self.proto not in self.protocols:
             raise Exception("Requested protocol <%s> is not available" %\
                     (self.proto))
         if self.log:

@@ -42,7 +42,10 @@ import uuid
 from abc import ABCMeta
 from pyvfs.vfs import Storage, Inode, Eexist, Eperm, restrict
 from pyvfs.utils import Server
-from ConfigParser import SafeConfigParser
+if sys.version_info[0] > 2:
+    from configparser import ConfigParser
+else:
+    from ConfigParser import SafeConfigParser as ConfigParser
 
 
 Skip = ABCMeta("Skip", (object,), {})
@@ -54,13 +57,15 @@ Skip.register(types.ModuleType)
 
 
 Cls = ABCMeta("Cls", (object,), {})
-Cls.register(types.ClassType)
 Cls.register(type)
+if sys.version_info[0] == 2:
+    Cls.register(types.ClassType)
 
 
 Func = ABCMeta("Func", (object,), {})
 Func.register(types.FunctionType)
-Func.register(types.UnboundMethodType)
+if sys.version_info[0] == 2:
+    Func.register(types.UnboundMethodType)
 
 
 List = ABCMeta("List", (object,), {})
@@ -73,19 +78,21 @@ List.register(frozenset)
 String = ABCMeta("String", (object,), {})
 String.register(str)
 String.register(bytes)
-String.register(unicode)
+if sys.version_info[0] == 2:
+    String.register(unicode)
 
 
 File = ABCMeta("File", (object,), {})
 File.register(bool)
-File.register(types.FileType)
 File.register(float)
 File.register(int)
-File.register(long)
 File.register(bytes)
 File.register(str)
-File.register(unicode)
 File.register(type(None))
+if sys.version_info[0] == 2:
+    File.register(types.FileType)
+    File.register(unicode)
+    File.register(long)
 
 
 def _setattr(obj, item, value):
@@ -301,7 +308,7 @@ class vInode(Inode):
             self_id = id(weakref.proxy(self.observe))
         except:
             self_id = id(self.observe)
-        if self_id in list(self.stack.keys()):
+        if self_id in self.stack:
             raise Eexist(self.stack[self_id])
         self.stack[self_id] = self
         self.cleanup["stack"] = (self.stack.pop, (id(self.observe),))
@@ -486,7 +493,7 @@ class vFunctionCall(vInode):
             return
         self.called = True
         self.seek(0)
-        config = SafeConfigParser()
+        config = ConfigParser()
         try:
             config.readfp(self)
             kwarg = dict([(x[0], ast.literal_eval(x[1])) for x
@@ -589,9 +596,12 @@ class vLiteral(vInode):
         self.seek(0)
         self.truncate()
         try:
-            self.write(str(self.observe))
+            if isinstance(self.observe, unicode):
+                self.write(bytes(self.observe.encode('utf-8')))
+            else:
+                self.write(bytes(self.observe))
         except:
-            pass
+            self.write(traceback.format_exc())
 
 
 class ObjectFS(Storage):

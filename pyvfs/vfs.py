@@ -35,7 +35,7 @@ class Edebug(Exception):
     pass
 
 
-def restrict(c):
+def _restrict_debug(c):
     def wrapped(*argv, **kwarg):
         stack = inspect.stack()
         try:
@@ -51,6 +51,17 @@ def restrict(c):
                     (traceback.format_exc()))
         return c(*argv, **kwarg)
     return wrapped
+
+
+def _restrict_bypass(c):
+    return c
+
+
+if os.environ.get("PYVFS_LOG", "False").lower() in (
+        "yes", "true", "on", "t", "1"):
+    restrict = _restrict_debug
+else:
+    restrict = _restrict_bypass
 
 
 class Inode(BytesIO, object):
@@ -120,7 +131,7 @@ class Inode(BytesIO, object):
     def _set_name(self, name):
         self._check_special(name)
         try:
-            if name in list(self.parent.children.keys()):
+            if name in self.parent.children:
                 raise Eexist(self.parent.children[name])
             del self.parent.children[self.name]
         except Eexist as e:
@@ -193,7 +204,7 @@ class Inode(BytesIO, object):
 
     @restrict
     def add(self, inode):
-        if inode.name in list(self.children.keys()):
+        if inode.name in self.children:
             raise Eexist()
         self.children[inode.name] = inode
         inode.parent = self
@@ -279,7 +290,7 @@ class Storage(object):
     def reparent(self, new_parent, inode, new_name=None):
         with self.lock:
             lookup = new_name or inode.name
-            if lookup in list(new_parent.children.keys()):
+            if lookup in new_parent.children:
                 raise Eexist()
             inode.parent.remove(inode)
             if new_name:
@@ -335,7 +346,6 @@ class Storage(object):
             inode.destroy()
 
     def chmod(self, inode, mode):
-        print oct(mode)
         inode.mode = ((inode.mode & 0o7777) ^ inode.mode) |\
                 (mode & 0o7777)
 
