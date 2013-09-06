@@ -699,7 +699,22 @@ def export(*argv, **kwarg):
 
             ...
 
+    In the case when __init__() is not called (e.g., in pickling or
+    SQLAlchemy), on can use `@export` on some particular method. In
+    this case make sure that `@export` is the last in the decorator
+    chain::
+
+        class Record(Base):
+            field1 = Column(String)
+            field2 = Column(String)
+
+            @reconstructor
+            @export(set_hook=True)
+            def hook(self):
+                pass
+
     Right now supported parameters are:
+        * **set_hook** -- use the function as a reconstruction hook
         * **basedir** -- The base directory, where to put objects. If it
           doesn't exist, it will be created.
         * **blacklist** -- The list of paths from the **object tree root**,
@@ -725,6 +740,7 @@ def export(*argv, **kwarg):
               you want your FS for some reason be searchable by
               recursive grep, you should use this option.
     """
+    set_hook = kwarg.get("set_hook", False)
     basedir = kwarg.get("basedir", "").split("/")
     blacklist = kwarg.get("blacklist", [])
     functions = kwarg.get("functions", False)
@@ -745,7 +761,16 @@ def export(*argv, **kwarg):
                                 cycle_detect="none")
             return parent
 
-        if isinstance(c, types.FunctionType):
+        if set_hook:
+            def new_hook(self, *argv, **kwarg):
+                parent = create_basedir(basedir)
+                fs.create(name=None, root=True, parent=parent, obj=self,
+                          blacklist=blacklist, functions=functions,
+                          weakref=weakref, cycle_detect=cycle_detect)
+                return c(self, *argv, **kwarg)
+            return new_hook
+
+        elif isinstance(c, types.FunctionType):
             parent = create_basedir(basedir)
             fs.create(name=None, root=True, parent=parent, obj=c,
                     blacklist=blacklist, functions=True, weakref=False)
