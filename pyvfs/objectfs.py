@@ -337,7 +337,7 @@ class vInode(Inode):
             self.name != ".repr":
             try:
                 if self.callback:
-                    self.callback(self.getvalue())
+                    getattr(self.observe, self.callback)(self.getvalue())
                 elif isinstance(self.observe, bool):
                     _setattr(self.parent.observe, self.name,
                             self.getvalue().lower() in (
