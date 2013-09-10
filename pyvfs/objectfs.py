@@ -142,6 +142,10 @@ def _get_name(obj):
     if isinstance(obj, types.FunctionType):
         return obj.func_name
 
+    file_name = getattr(obj, 'file_name', None)
+    if file_name is not None:
+        return file_name
+
     try:
         text = obj.__repr__()
         if text.find("/") == -1:
@@ -164,6 +168,12 @@ def _get_name(obj):
     except:
         return "0x%x" % (id(obj))
 
+
+def _is_file(obj):
+    is_file = getattr(obj, 'is_file', False)
+    if not is_file:
+        is_file = isinstance(obj, File)
+    return is_file
 
 class vRepr(Inode):
     """
@@ -206,7 +216,7 @@ class vInode(Inode):
             ]
 
     def __init__(self, name, parent=None, mode=0, storage=None,
-            obj=None, root=None, **kwarg):
+            obj=None, root=None, callback=None, **kwarg):
 
         # respect preset mode
         if not (mode | self.mode):
@@ -219,6 +229,7 @@ class vInode(Inode):
             self.stack = {}
         self.kwarg = kwarg
         self.root = root
+        self.callback = callback
         self.blacklist = None
         self.blacklist = kwarg.get("blacklist", None) or \
                 self.parent.blacklist
@@ -325,7 +336,9 @@ class vInode(Inode):
         if (self.mode & stat.S_IFREG) and \
             self.name != ".repr":
             try:
-                if isinstance(self.observe, bool):
+                if self.callback:
+                    self.callback(self.getvalue())
+                elif isinstance(self.observe, bool):
                     _setattr(self.parent.observe, self.name,
                             self.getvalue().lower() in (
                             "yes", "true", "on", "t", "1"))
@@ -651,7 +664,7 @@ class ObjectFS(Storage):
                             kwarg.get("functions", False):
                         klass = vFunction
                         mode = stat.S_IFDIR
-                    elif isinstance(obj, File):
+                    elif _is_file(obj):
                         klass = vLiteral
                         mode = stat.S_IFREG
                     else:
@@ -746,6 +759,7 @@ def export(*argv, **kwarg):
     functions = kwarg.get("functions", False)
     weakref = kwarg.get("weakref", True)
     cycle_detect = kwarg.get("cycle_detect", "symlink")
+    callback = kwarg.get("callback", None)
 
     def wrap(c):
         global fs
@@ -785,10 +799,15 @@ def export(*argv, **kwarg):
 
             def new_init(self, *argv, **kwarg):
                 old_init(self, *argv, **kwarg)
-                parent = create_basedir(basedir)
+                if len(basedir) and len(basedir[0]) and basedir[0][0] == '@':
+                    bd = getattr(self, basedir[0][1:], '').split('/')
+                else:
+                    bd = basedir
+                parent = create_basedir(bd)
                 fs.create(name=None, root=True, parent=parent, obj=self,
                         blacklist=blacklist, functions=functions,
-                        weakref=weakref, cycle_detect=cycle_detect)
+                        weakref=weakref, cycle_detect=cycle_detect,
+                        callback=callback)
             c.__init__ = new_init
 
         return c
