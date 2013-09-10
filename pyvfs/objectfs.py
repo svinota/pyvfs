@@ -222,6 +222,9 @@ class vInode(Inode):
         if not (mode | self.mode):
             self.mode = stat.S_IFDIR
 
+        if mode:
+            self.mode = mode
+
         Inode.__init__(self, name, parent, mode, storage)
         if hasattr(self.parent, "stack"):
             self.stack = self.parent.stack
@@ -658,7 +661,7 @@ class ObjectFS(Storage):
 
             try:
                 klass = Inode
-                mode = stat.S_IFREG
+                mode |= stat.S_IFREG
                 if len(kwarg.keys()) > 0:
                     if isinstance(obj, Func) and \
                             kwarg.get("functions", False):
@@ -666,7 +669,6 @@ class ObjectFS(Storage):
                         mode = stat.S_IFDIR
                     elif _is_file(obj):
                         klass = vLiteral
-                        mode = stat.S_IFREG
                     else:
                         klass = vInode
                         mode = stat.S_IFDIR
@@ -760,6 +762,7 @@ def export(*argv, **kwarg):
     weakref = kwarg.get("weakref", True)
     cycle_detect = kwarg.get("cycle_detect", "symlink")
     callback = kwarg.get("callback", None)
+    mode = kwarg.get("mode", 0o700)
 
     def wrap(c):
         global fs
@@ -807,7 +810,7 @@ def export(*argv, **kwarg):
                 fs.create(name=None, root=True, parent=parent, obj=self,
                         blacklist=blacklist, functions=functions,
                         weakref=weakref, cycle_detect=cycle_detect,
-                        callback=callback)
+                        callback=callback, mode=mode)
             c.__init__ = new_init
 
         return c
