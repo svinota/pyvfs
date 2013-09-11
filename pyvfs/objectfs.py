@@ -142,10 +142,6 @@ def _get_name(obj):
     if isinstance(obj, types.FunctionType):
         return obj.func_name
 
-    file_name = getattr(obj, 'file_name', None)
-    if file_name is not None:
-        return file_name
-
     try:
         text = obj.__repr__()
         if text.find("/") == -1:
@@ -167,13 +163,6 @@ def _get_name(obj):
         return "%s [%s]" % (obj.__class__.__name__, obj_id)
     except:
         return "0x%x" % (id(obj))
-
-
-def _is_file(obj):
-    is_file = getattr(obj, 'is_file', False)
-    if not is_file:
-        is_file = isinstance(obj, File)
-    return is_file
 
 
 class vRepr(Inode):
@@ -220,6 +209,8 @@ class vInode(Inode):
         # respect preset mode
         if not (mode | self.mode):
             self.mode = stat.S_IFDIR
+
+        self.preserve_name = name is not None
 
         if mode:
             self.mode = mode
@@ -304,7 +295,7 @@ class vInode(Inode):
             # object and it breaks cycle reference detection
             #
             # this won't work: lambda x: self.storage.remove(self)
-            if not self.kwarg.get("weakref", True):
+            if not self.kwarg.get("use_weakrefs", True):
                 raise Exception()
             wp = weakref.proxy(obj)
         except:
@@ -316,7 +307,7 @@ class vInode(Inode):
 
     def _check_cycle(self):
         try:
-            if not self.kwarg.get("weakref", True):
+            if not self.kwarg.get("use_weakrefs", True):
                 raise Exception()
             self_id = id(weakref.proxy(self.observe))
         except:
@@ -366,7 +357,7 @@ class vInode(Inode):
                 try:
                     if hasattr(k, "observe"):
                         _dir(k.observe)
-                        if k.observe is not None:
+                        if k.observe is not None and not self.preserve_name:
                             if _get_name(k.observe) != i:
                                 k.name = _get_name(k.observe)
                 except:
@@ -626,7 +617,7 @@ class ObjectFS(Storage):
     ObjectFS instances, the module starts only one storage.
     """
 
-    def create(self, name=None, parent=None, mode=0, obj=None, **kwarg):
+    def create(self, name=None, parent=None, obj=None, mode=0, **config):
         """
         Create an object inode and all the subtree. If ``parent``
         is not defined, attach new inode to the storage root.
@@ -653,7 +644,7 @@ class ObjectFS(Storage):
 
             if isinstance(obj, Skip) or \
                     (isinstance(obj, Func) and not
-                     kwarg.get("functions", False)):
+                     config.get("export_functions", False)):
                 return
 
             if name.startswith("_"):
@@ -662,18 +653,21 @@ class ObjectFS(Storage):
             try:
                 klass = Inode
                 mode |= stat.S_IFREG
-                if len(kwarg.keys()) > 0:
+                if config:
                     if isinstance(obj, Func) and \
-                            kwarg.get("functions", False):
+                            config.get("export_functions", False):
                         klass = vFunction
                         mode = stat.S_IFDIR
-                    elif _is_file(obj):
+                    elif isinstance(obj, File) or config.get('is_file', False):
                         klass = vLiteral
                     else:
                         klass = vInode
                         mode = stat.S_IFDIR
-                new = parent.create(name, klass=klass,
-                                    mode=mode, obj=obj, **kwarg)
+                new = parent.create(name,
+                                    klass=klass,
+                                    obj=obj,
+                                    mode=mode,
+                                    **config)
             except:
                 return
 
@@ -690,7 +684,61 @@ if os.environ.get("OBJECTFS_AUTOSTART", "True").lower() in (
     srv.start()
 
 
-def export(*argv, **kwarg):
+class Export(object):
+    '''
+    Class decorator
+    '''
+    def __init__(self, obj, config=None):
+        global fs
+        self.fs = fs
+        self.obj = obj
+        self.config = {'root': True,
+                       'name': None}
+        self.config.update(config or {})
+        if isinstance(self.obj, types.FunctionType):
+            self.config['export_functions'] = True
+            self.config['use_weakrefs'] = False
+            self.create(self.obj, self.config)
+            self.__call__ = obj
+
+    def __call__(self, *argv, **kwarg):
+        config = {}
+        config.update(self.config)
+        obj = self.obj(*argv, **kwarg)
+        for attr in ('basedir',
+                     'name',
+                     'on_commit',
+                     'on_open'):
+            value = config.get(attr, '')
+            if isinstance(value, basestring) and value and value[0] == '@':
+                config[attr] = getattr(obj, value[1:])
+        self.create(obj, config)
+        return obj
+
+    def mkdir(self, basedir):
+        if isinstance(basedir, basestring):
+            basedir = basedir.split('/')
+
+        parent = self.fs.root
+        for name in basedir:
+            if name != '':
+                try:
+                    parent = parent.children[name]
+                except:
+                    parent = vInode(name,
+                                    parent,
+                                    mode=stat.S_IFDIR,
+                                    cycle_detect="none")
+        return parent
+
+    def create(self, obj, config):
+        self.fs.create(parent=self.mkdir(config.get('basedir', '')),
+                       obj=obj,
+                       mode=config.pop('mode', 0o700),
+                       **config)
+
+
+def export(obj=None, **kwarg):
     """
     The decorator, that is used to export objects to the filesystem.
     It can be used in two ways. The first, simplest, way allows you just
@@ -755,70 +803,13 @@ def export(*argv, **kwarg):
               you want your FS for some reason be searchable by
               recursive grep, you should use this option.
     """
-    set_hook = kwarg.get("set_hook", False)
-    basedir = kwarg.get("basedir", "").split("/")
-    blacklist = kwarg.get("blacklist", [])
-    functions = kwarg.get("functions", False)
-    weakref = kwarg.get("weakref", True)
-    cycle_detect = kwarg.get("cycle_detect", "symlink")
-    callback = kwarg.get("callback", None)
-    mode = kwarg.get("mode", 0o700)
-
-    def wrap(c):
-        global fs
-
-        def create_basedir(basedir):
-            parent = fs.root
-            for i in basedir:
-                if i != "":
-                    try:
-                        parent = parent.children[i]
-                    except:
-                        parent = vInode(i, parent, mode=stat.S_IFDIR,
-                                        cycle_detect="none")
-            return parent
-
-        if set_hook:
-            def new_hook(self, *argv, **kwarg):
-                parent = create_basedir(basedir)
-                fs.create(name=None, root=True, parent=parent, obj=self,
-                          blacklist=blacklist, functions=functions,
-                          weakref=weakref, cycle_detect=cycle_detect)
-                return c(self, *argv, **kwarg)
-            return new_hook
-
-        elif isinstance(c, types.FunctionType):
-            parent = create_basedir(basedir)
-            fs.create(name=None, root=True, parent=parent, obj=c,
-                      blacklist=blacklist, functions=True, weakref=False)
-
-        elif isinstance(c, Cls):
-            if hasattr(c, "__init__"):
-                old_init = c.__init__
-            else:
-                def fake_init(*argv, **kwarg):
-                    pass
-                old_init = fake_init
-
-            def new_init(self, *argv, **kwarg):
-                old_init(self, *argv, **kwarg)
-                if len(basedir) and len(basedir[0]) and basedir[0][0] == '@':
-                    bd = getattr(self, basedir[0][1:], '').split('/')
-                else:
-                    bd = basedir
-                parent = create_basedir(bd)
-                fs.create(name=None, root=True, parent=parent, obj=self,
-                          blacklist=blacklist, functions=functions,
-                          weakref=weakref, cycle_detect=cycle_detect,
-                          callback=callback, mode=mode)
-            c.__init__ = new_init
-
-        return c
-
-    if len(argv):
-        return wrap(argv[0])
+    if obj:
+        return Export(obj, **kwarg)
     else:
-        return wrap
+        def wrapper(obj):
+            return Export(obj, **kwarg)
+        return wrapper
+
 
 # make the module safe for import
 __all__ = ["export", "srv"]
