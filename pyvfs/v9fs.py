@@ -21,24 +21,25 @@ except Exception as e:
 
 
 def inode2dir(inode):
-    return py9p.Dir(
-            dotu=1,
-            type=0,
-            dev=0,
-            qid=py9p.Qid((py9p.mode2plan(inode.mode) >> 24) & py9p.QTDIR, 0,
-                inode.path),
-            mode=py9p.mode2plan(inode.mode),
-            atime=inode.atime,
-            mtime=inode.mtime,
-            length=inode.length,
-            name=bytes(inode.name.encode('utf-8')),
-            uid=bytes(inode.uid.encode('utf-8')),
-            gid=bytes(inode.gid.encode('utf-8')),
-            muid=bytes(inode.muid.encode('utf-8')),
-            extension=inode.getvalue() if inode.mode == stat.S_IFLNK else b'',
-            uidnum=inode.uidnum,
-            gidnum=inode.gidnum,
-            muidnum=inode.muidnum)
+    return py9p.Dir(dotu=1,
+                    type=0,
+                    dev=0,
+                    qid=py9p.Qid((py9p.mode2plan(inode.mode) >> 24) &
+                                 py9p.QTDIR,
+                                 0, inode.path),
+                    mode=py9p.mode2plan(inode.mode),
+                    atime=inode.atime,
+                    mtime=inode.mtime,
+                    length=inode.length,
+                    name=bytes(inode.name.encode('utf-8')),
+                    uid=bytes(inode.uid.encode('utf-8')),
+                    gid=bytes(inode.gid.encode('utf-8')),
+                    muid=bytes(inode.muid.encode('utf-8')),
+                    extension=inode.getvalue() if
+                    inode.mode == stat.S_IFLNK else b'',
+                    uidnum=inode.uidnum,
+                    gidnum=inode.gidnum,
+                    muidnum=inode.muidnum)
 
 
 def checkout(c):
@@ -72,11 +73,11 @@ class v9fs(py9p.Server):
     @checkout
     def create(self, srv, req, inode):
         new = self.storage.create(req.ifcall.name, inode,
-            py9p.mode2stat(req.ifcall.perm))
+                                  py9p.mode2stat(req.ifcall.perm))
         if new.mode == stat.S_IFLNK:
             new.write(bytes(req.ifcall.extension.encode('utf-8')))
         req.ofcall.qid = py9p.Qid((req.ifcall.perm >> 24) & py9p.QTDIR, 0,
-            new.path)
+                                  new.path)
         srv.respond(req, None)
 
     @checkout
@@ -96,7 +97,7 @@ class v9fs(py9p.Server):
         for (i, k) in list(f.children.items()):
             if req.ifcall.wname[0] == i:
                 qid = py9p.Qid((py9p.mode2plan(k.mode) >> 24) & py9p.QTDIR, 0,
-                    hash(k))
+                               hash(k))
                 req.ofcall.wqid.append(qid)
                 if len(req.ifcall.wname) > 1:
                     req.ifcall.wname.pop(0)
@@ -135,7 +136,8 @@ class v9fs(py9p.Server):
     @checkout
     def write(self, srv, req, inode):
         req.ofcall.count = self.storage.write(inode,
-            req.ifcall.data, req.ifcall.offset)
+                                              req.ifcall.data,
+                                              req.ifcall.offset)
         srv.respond(req, None)
 
     @checkout
@@ -165,7 +167,7 @@ class v9fs(py9p.Server):
                     req.ofcall.stat.append(inode2dir(k))
         else:
             req.ofcall.data = self.storage.read(inode, req.ifcall.count,
-                req.ifcall.offset)
+                                                req.ifcall.offset)
             req.ofcall.count = len(req.ofcall.data)
 
         srv.respond(req, None)

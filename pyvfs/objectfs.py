@@ -175,6 +175,7 @@ def _is_file(obj):
         is_file = isinstance(obj, File)
     return is_file
 
+
 class vRepr(Inode):
     """
     Sometimes ``__repr__()`` returns a string that can not be used
@@ -211,12 +212,10 @@ class vInode(Inode):
     from the filesystem.
     """
 
-    auto_names = [
-            ".repr",
-            ]
+    auto_names = [".repr", ]
 
     def __init__(self, name, parent=None, mode=0, storage=None,
-            obj=None, root=None, callback=None, **kwarg):
+                 obj=None, root=None, callback=None, **kwarg):
 
         # respect preset mode
         if not (mode | self.mode):
@@ -235,7 +234,7 @@ class vInode(Inode):
         self.callback = callback
         self.blacklist = None
         self.blacklist = kwarg.get("blacklist", None) or \
-                self.parent.blacklist
+            self.parent.blacklist
         if isinstance(self.blacklist, List):
             if self.absolute_path(stop=self.get_root()) in self.blacklist:
                 self.destroy()
@@ -255,8 +254,8 @@ class vInode(Inode):
         except Eexist as e:
             if cycle_detect == "symlink":
                 self.write(self.relative_path(e.target.absolute_path()))
-                e.target.cleanup[str(id(self))] = (
-                        self.storage.destroy, (self,))
+                e.target.cleanup[str(id(self))] = (self.storage.destroy,
+                                                   (self,))
                 self.mode = stat.S_IFLNK
             else:
                 self.destroy()
@@ -337,17 +336,17 @@ class vInode(Inode):
         and the attribute will be unchanged.
         """
         if (self.mode & stat.S_IFREG) and \
-            self.name != ".repr":
+                self.name != ".repr":
             try:
                 if self.callback:
                     getattr(self.observe, self.callback)(self.getvalue())
                 elif isinstance(self.observe, bool):
                     _setattr(self.parent.observe, self.name,
-                            self.getvalue().lower() in (
-                            "yes", "true", "on", "t", "1"))
+                             self.getvalue().lower() in
+                             ("yes", "true", "on", "t", "1"))
                 else:
                     _setattr(self.parent.observe, self.name,
-                        type(self.observe)(self.getvalue()))
+                             type(self.observe)(self.getvalue()))
             except Exception as e:
                 logging.debug("[%s] commit() failed: %s" % (
                     self.path, str(e)))
@@ -381,14 +380,15 @@ class vInode(Inode):
             except:
                 obs = set()
             to_delete = chs - obs -\
-                    set(self.special_names) -\
-                    set(self.auto_names)
+                set(self.special_names) -\
+                set(self.auto_names)
             to_create = obs - chs
             for i in to_delete:
                 self.children[i].destroy()
             for i in to_create:
                 self.storage.create(name=i, parent=self,
-                        obj=_getattr(self.observe, i), **self.kwarg)
+                                    obj=_getattr(self.observe, i),
+                                    **self.kwarg)
 
 
 class vFunction(vInode):
@@ -406,11 +406,11 @@ class vFunction(vInode):
         vInode.__init__(self, *argv, **kwarg)
         try:
             self.children["code"] = vFunctionCode("code", self,
-                    cycle_detect="none")
+                                                  cycle_detect="none")
             self.children["call"] = vFunctionCall("call", self,
-                    cycle_detect="none")
+                                                  cycle_detect="none")
             self.children["context"] = vFunctionContext("context", self,
-                    cycle_detect="none")
+                                                        cycle_detect="none")
         except Exception as e:
             self.destroy()
             raise e
@@ -513,7 +513,7 @@ class vFunctionCall(vInode):
         try:
             config.readfp(self)
             kwarg = dict([(x[0], ast.literal_eval(x[1])) for x
-                    in config.items('call')])
+                          in config.items('call')])
             result = self.observe(**kwarg)
         except:
             result = traceback.format_exc()
@@ -555,7 +555,7 @@ class vFunctionContext(vInode):
 
     def open(self):
         new = vFunctionCall("call-%s" % (uuid.uuid4()), self.parent,
-                cycle_detect="none")
+                            cycle_detect="none")
         self.parent.auto_names.append(new.name)
         self.seek(0)
         self.truncate()
@@ -652,8 +652,8 @@ class ObjectFS(Storage):
                 name = _get_name(obj)
 
             if isinstance(obj, Skip) or \
-                    (isinstance(obj, Func) and not \
-                    kwarg.get("functions", False)):
+                    (isinstance(obj, Func) and not
+                     kwarg.get("functions", False)):
                 return
 
             if name.startswith("_"):
@@ -673,7 +673,7 @@ class ObjectFS(Storage):
                         klass = vInode
                         mode = stat.S_IFDIR
                 new = parent.create(name, klass=klass,
-                        mode=mode, obj=obj, **kwarg)
+                                    mode=mode, obj=obj, **kwarg)
             except:
                 return
 
@@ -775,7 +775,7 @@ def export(*argv, **kwarg):
                         parent = parent.children[i]
                     except:
                         parent = vInode(i, parent, mode=stat.S_IFDIR,
-                                cycle_detect="none")
+                                        cycle_detect="none")
             return parent
 
         if set_hook:
@@ -790,7 +790,7 @@ def export(*argv, **kwarg):
         elif isinstance(c, types.FunctionType):
             parent = create_basedir(basedir)
             fs.create(name=None, root=True, parent=parent, obj=c,
-                    blacklist=blacklist, functions=True, weakref=False)
+                      blacklist=blacklist, functions=True, weakref=False)
 
         elif isinstance(c, Cls):
             if hasattr(c, "__init__"):
@@ -808,9 +808,9 @@ def export(*argv, **kwarg):
                     bd = basedir
                 parent = create_basedir(bd)
                 fs.create(name=None, root=True, parent=parent, obj=self,
-                        blacklist=blacklist, functions=functions,
-                        weakref=weakref, cycle_detect=cycle_detect,
-                        callback=callback, mode=mode)
+                          blacklist=blacklist, functions=functions,
+                          weakref=weakref, cycle_detect=cycle_detect,
+                          callback=callback, mode=mode)
             c.__init__ = new_init
 
         return c

@@ -42,13 +42,13 @@ def _restrict_debug(c):
             caller = stack[1][0].f_locals['self']
             line = stack[1][0].f_code.co_firstlineno
             assert isinstance(caller, Storage) or\
-                    isinstance(caller, Inode)
+                isinstance(caller, Inode)
         except AssertionError:
-            logging.warning("Inode method %s called from: %s:%s" %\
-                    (c, caller, line))
+            logging.warning("Inode method %s called from: %s:%s" %
+                            (c, caller, line))
         except:
-            logging.error("Got error while analyzing stack: %s" %\
-                    (traceback.format_exc()))
+            logging.error("Got error while analyzing stack: %s" %
+                          (traceback.format_exc()))
         return c(*argv, **kwarg)
     return wrapped
 
@@ -71,10 +71,8 @@ class Inode(BytesIO, object):
     mode = 0
     cleanup = None
     # static member for special names
-    special_names = [
-            ".",
-            "..",
-            ]
+    special_names = [".",
+                     ".."]
 
     def __init__(self, name, parent=None, mode=0, storage=None, **kwarg):
 
@@ -122,7 +120,7 @@ class Inode(BytesIO, object):
         self.storage.register(self)
         self.cleanup["storage"] = (self.storage.destroy, (self,))
         for (i, k) in [x for x in list(self.children.items())
-                if x[0] not in (".", "..")]:
+                       if x[0] not in (".", "..")]:
             k._update_register()
 
     def _get_name(self):
@@ -139,7 +137,7 @@ class Inode(BytesIO, object):
         except:
             pass
         self.__name = name
-        if (self.parent != self) and (self.parent != None):
+        if (self.parent != self) and (self.parent is not None):
             self.parent.children[name] = self
         try:
             self._update_register()
@@ -229,7 +227,7 @@ class Inode(BytesIO, object):
         if klass is None:
             klass = type(self)
         self.children[name] = klass(name, self, mode=mode,
-            storage=self.storage, **kwarg)
+                                    storage=self.storage, **kwarg)
         return self.children[name]
 
     @restrict
@@ -261,7 +259,7 @@ class Storage(object):
         self.files = {}
         self.lock = threading.RLock()
         self.root = inode(name="/", mode=stat.S_IFDIR, storage=self,
-                **kwarg)
+                          **kwarg)
 
     def register(self, inode):
         """
@@ -347,7 +345,7 @@ class Storage(object):
 
     def chmod(self, inode, mode):
         inode.mode = ((inode.mode & 0o7777) ^ inode.mode) |\
-                (mode & 0o7777)
+            (mode & 0o7777)
 
     def chown(self, inode, uid, gid):
         if uid > -1:

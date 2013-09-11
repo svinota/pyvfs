@@ -33,7 +33,7 @@ class Example(object):
         want, you can change the naming with __repr__()
         """
         return "%s(%s) at 0x%x" % (self.__class__.__name__,
-                self.text, id(self))
+                                   self.text, id(self))
 
 
 # please note, that objects of derived classes will be

@@ -134,29 +134,27 @@ class Server(threading.Thread):
         server = Server(CustomStorage())
         server.start()
     """
-    parser = {
-            "proto": "9p",
-            "address": "127.0.0.1",
-            "port": 10001,
-            "mountpoint": "./mnt",
-            "debug": False,
-            "log": False,
-            "allow_root": False,
-            "allow_other": False,
-            "authmode": "",
-            "keyfiles": {},
-            }
+    parser = {"proto": "9p",
+              "address": "127.0.0.1",
+              "port": 10001,
+              "mountpoint": "./mnt",
+              "debug": False,
+              "log": False,
+              "allow_root": False,
+              "allow_other": False,
+              "authmode": "",
+              "keyfiles": {}}
 
     def __init__(self, fs=None):
         threading.Thread.__init__(self,
-                name="PyVFS for ObjectFS at 0x%x" % (id(fs)))
+                                  name="PyVFS for ObjectFS at 0x%x" %
+                                  (id(fs)))
         self.setDaemon(True)
         self.fs = fs or Storage()
         for (i, k) in list(self.parser.items()):
             value = os.environ.get("PYVFS_%s" % (i.upper()), str(k))
             if isinstance(k, bool):
-                value = value.lower() in (
-                        "yes", "true", "on", "t", "1")
+                value = value.lower() in ("yes", "true", "on", "t", "1")
             elif isinstance(k, dict):
                 value = ast.literal_eval(value)
             elif not isinstance(k, str):
@@ -168,8 +166,8 @@ class Server(threading.Thread):
             if i not in protocols:
                 del self.protocols[i]
         if self.proto not in self.protocols:
-            raise Exception("Requested protocol <%s> is not available" %\
-                    (self.proto))
+            raise Exception("Requested protocol <%s> is not available" %
+                            (self.proto))
         if self.log:
             indexInode("index", self.fs.root)
             log = logInode("log", self.fs.root, maxlen=1024)
@@ -189,14 +187,14 @@ class Server(threading.Thread):
 
     def mount_v9fs(self):
         srv = py9p.Server(listen=(self.address, self.port),
-                authmode=self.authmode, key=self.keyfiles,
-                chatty=self.debug, dotu=True)
+                          authmode=self.authmode, key=self.keyfiles,
+                          chatty=self.debug, dotu=True)
         srv.mount(v9fs(self.fs))
         return srv.serve
 
     def mount_fuse(self):
         srv = ffs(storage=self.fs, version="%prog " + fuse.__version__,
-                dash_s_do='undef')
+                  dash_s_do='undef')
         srv.fuse_args.setmod('foreground')
         if self.debug:
             srv.fuse_args.add('debug')
@@ -207,7 +205,5 @@ class Server(threading.Thread):
         srv.fuse_args.mountpoint = os.path.realpath(self.mountpoint)
         return srv.main
 
-    protocols = {
-            "9p": mount_v9fs,
-            "fuse": mount_fuse,
-            }
+    protocols = {"9p": mount_v9fs,
+                 "fuse": mount_fuse}
