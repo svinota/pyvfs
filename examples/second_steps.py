@@ -35,12 +35,6 @@ class Example(object):
         self.text = '%s (%s)' % (self.__class__.__name__, text)
         self.is_file = True
         self.vala = "dala"
-        print globals()
-        print dir(self)
-        print self.__dict__
-
-    def bala(self):
-        print "dala"
 
     def __repr__(self):
         """

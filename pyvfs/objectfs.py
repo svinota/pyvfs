@@ -716,7 +716,8 @@ class MetaExport(type):
 
         # create local config copy
         config = deepcopy(getattr(obj, '__inode__', {}))
-        print "Meta call with", config
+        config['root'] = True
+        print "Meta call", id(obj), config
 
         # load per-object attributes
         # e.g.: config['name'] == '@file_name' will
