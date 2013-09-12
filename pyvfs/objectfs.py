@@ -40,6 +40,7 @@ import traceback
 import inspect
 import uuid
 from abc import ABCMeta
+from copy import deepcopy
 from pyvfs.vfs import Storage, Inode, Eexist, Eperm, restrict
 from pyvfs.utils import Server
 if sys.version_info[0] > 2:
@@ -616,6 +617,27 @@ class ObjectFS(Storage):
     ObjectFS storage class. Though there is no limit of
     ObjectFS instances, the module starts only one storage.
     """
+    def mkdir(self, basedir):
+        if isinstance(basedir, basestring):
+            basedir = basedir.split('/')
+
+        parent = self.root
+        for name in basedir:
+            if name != '':
+                try:
+                    parent = parent.children[name]
+                except:
+                    parent = vInode(name,
+                                    parent,
+                                    mode=stat.S_IFDIR,
+                                    cycle_detect="none")
+        return parent
+
+    def export_item(self, obj, config):
+        self.create(parent=self.mkdir(config.get('basedir', '')),
+                    obj=obj,
+                    mode=config.pop('mode', 0o700),
+                    **config)
 
     def create(self, name=None, parent=None, obj=None, mode=0, **config):
         """
@@ -684,61 +706,84 @@ if os.environ.get("OBJECTFS_AUTOSTART", "True").lower() in (
     srv.start()
 
 
-class Export(object):
+class MetaExport(type):
+    def __call__(cls, *argv, **kwarg):
+        '''
+        '''
+        global fs
+        # do normal init
+        obj = type.__call__(cls, *argv, **kwarg)
+
+        # create local config copy
+        config = deepcopy(getattr(obj, '__inode__', {}))
+        print "Meta call with", config
+
+        # load per-object attributes
+        # e.g.: config['name'] == '@file_name' will
+        # load config['name'] from obj.file_name
+        for (key, item) in config.items():
+            if isinstance(item, basestring) and\
+                    item and \
+                    item[0] == '@' and\
+                    hasattr(obj, item[1:]):
+                config[key] = getattr(obj, item[1:])
+
+        # create the FS object
+        # pls note, that `self` here belongs to
+        # the decorator namespace
+        logging.debug('create object %s with config %s' % (obj, config))
+        fs.export_item(obj, config)
+        return obj
+
+class export(object):
     '''
     Class decorator
     '''
-    def __init__(self, obj, config=None):
+    def __init__(self, config=None):
+        '''
+        The code::
+
+            @export(...)
+            class A:
+
+        Results in this::
+
+            A = export(...)(A)
+
+        The first call is `__init__()`, the second is
+        `__call__()`. So, in the init we set up all
+        the environment
+        '''
         global fs
         self.fs = fs
-        self.obj = obj
         self.config = {'root': True,
                        'name': None}
         self.config.update(config or {})
-        if isinstance(self.obj, types.FunctionType):
+
+    def __call__(self, wrap):
+        '''
+        This function is used to actually decorate the
+        class or a function.
+        '''
+        # the decorated object is a function
+        if isinstance(wrap, types.FunctionType):
             self.config['export_functions'] = True
             self.config['use_weakrefs'] = False
-            self.create(self.obj, self.config)
-            self.__call__ = obj
+            self.create(wrap, self.config)
+            return wrap
 
-    def __call__(self, *argv, **kwarg):
-        config = {}
-        config.update(self.config)
-        obj = self.obj(*argv, **kwarg)
-        for attr in ('basedir',
-                     'name',
-                     'on_commit',
-                     'on_open'):
-            value = config.get(attr, '')
-            if isinstance(value, basestring) and value and value[0] == '@':
-                config[attr] = getattr(obj, value[1:])
-        self.create(obj, config)
-        return obj
+        # the decorated object is a type
+        # so, substitue config['on_init']
 
-    def mkdir(self, basedir):
-        if isinstance(basedir, basestring):
-            basedir = basedir.split('/')
-
-        parent = self.fs.root
-        for name in basedir:
-            if name != '':
-                try:
-                    parent = parent.children[name]
-                except:
-                    parent = vInode(name,
-                                    parent,
-                                    mode=stat.S_IFDIR,
-                                    cycle_detect="none")
-        return parent
-
-    def create(self, obj, config):
-        self.fs.create(parent=self.mkdir(config.get('basedir', '')),
-                       obj=obj,
-                       mode=config.pop('mode', 0o700),
-                       **config)
+        # reassemble class dict:
+        new_dict = dict(wrap.__dict__)
+        new_dict['__dict__'] = new_dict
+        # return hacked type
+        return MetaExport(wrap.__name__, wrap.__bases__, new_dict)
 
 
-def export(obj=None, **kwarg):
+
+def __export(obj=None, **kwarg):
     """
     The decorator, that is used to export objects to the filesystem.
     It can be used in two ways. The first, simplest, way allows you just

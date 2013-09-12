@@ -4,7 +4,7 @@ Simple PyVFS example
 """
 
 # start PyVFS thread and import the decorator
-from pyvfs.objectfs import export
+from pyvfs.objectfs import MetaExport
 
 # Python3 support
 import sys
@@ -15,8 +15,15 @@ if sys.version_info[0] > 2:
 
 # export all objects of the Example class
 # do not export "boo" atributes (see Child class)
-@export(blacklist=["/boo"])
+
 class Example(object):
+
+    __metaclass__ = MetaExport
+    __inode__ = {'blacklist': ['boo'],
+                 'mode': 0o644,
+                 'is_file': '@is_file',
+                 'name': '@text'}
+    dala = "bala"
 
     def __init__(self, text):
         """
@@ -24,7 +31,16 @@ class Example(object):
         with wrapped function, that creates weakref.proxy()
         to the object.
         """
-        self.text = text
+        print "Example init"
+        self.text = '%s (%s)' % (self.__class__.__name__, text)
+        self.is_file = True
+        self.vala = "dala"
+        print globals()
+        print dir(self)
+        print self.__dict__
+
+    def bala(self):
+        print "dala"
 
     def __repr__(self):
         """
@@ -51,6 +67,8 @@ class Child(Example):
         will not even notice that unless you will read the log
         """
         Example.__init__(self, text)
+        print "Child init"
+        self.is_file = False
         self.id = id(self)
         # this one will not be exported, 'cause it is
         # blacklisted
@@ -66,7 +84,7 @@ class Child(Example):
         return "%s [0x%x]" % (self.__class__.__name__, self.id)
 
 # spawn several objects
-objects_A = [Example(x) for x in range(5)]
+objects_A = [Example(x) for x in range(2)]
 objects_B = [Child(x) for x in range(2)]
 
 # now you can mount your script with the command
