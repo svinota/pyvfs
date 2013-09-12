@@ -4,7 +4,7 @@ Simplest PyVFS example
 """
 
 # start PyVFS thread and import the decorator
-from pyvfs.objectfs import export
+from pyvfs.objectfs import MetaExport
 
 # Python3 support
 import sys
@@ -13,15 +13,16 @@ if sys.version_info[0] > 2:
         return input(s)
 
 
-# export all objects of the Example class
-@export
 class Example(object):
+
+    # export all objects of the Example class
+    __metaclass__ = MetaExport
 
     def __init__(self, text):
         self.text = text
 
 # spawn several objects
-objects_A = [Example(x) for x in range(1000)]
+objects_A = [Example(x) for x in range(10)]
 
 # now you can mount your script with the command
 # mount -t 9p -o ro,port=10001 127.0.0.1 /mnt

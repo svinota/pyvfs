@@ -15,23 +15,25 @@ if sys.version_info[0] > 2:
 
 # export all objects of the Example class
 # do not export "boo" atributes (see Child class)
-
 class Example(object):
 
+    # this tells python to use MetaExport for this class
+    # and all child classes.
     __metaclass__ = MetaExport
+
+    # the configuration of the inode, it also will be
+    # inherited by children
     __inode__ = {'blacklist': ['boo'],
                  'mode': 0o644,
                  'is_file': '@is_file',
                  'name': '@text'}
-    dala = "bala"
 
     def __init__(self, text):
         """
-        PyVFS @export decorator substitutes the constructor
-        with wrapped function, that creates weakref.proxy()
-        to the object.
+        Latest PyVFS revision, that uses metaclass to export
+        objects, doesn't modify classed in any way. So,
+        `__init__()` remains intact.
         """
-        print "Example init"
         self.text = '%s (%s)' % (self.__class__.__name__, text)
         self.is_file = True
         self.vala = "dala"
@@ -40,7 +42,10 @@ class Example(object):
         """
         Files inside the object tree are named after attributes
         names, but the tree root is named automatically. If you
-        want, you can change the naming with __repr__()
+        want, you can change the naming with `__repr__()`
+
+        But if `is_file` == True, then `__repr__()` will return
+        file's content.
         """
         return "%s(%s) at 0x%x" % (self.__class__.__name__,
                                    self.text, id(self))
@@ -51,31 +56,12 @@ class Example(object):
 class Child(Example):
 
     def __init__(self, text):
-        """
-        The most tricky thing is that in this case the object
-        will be exported by parent's __init__(), and just after
-        creation it will not have all the attributes and,
-        possibly, will not be ready for __repr__(). But we don't
-        care, 'cause it is sync'ed in runtime, and in the case
-        of failing __repr__() it will be renamed later -- you
-        will not even notice that unless you will read the log
-        """
         Example.__init__(self, text)
-        print "Child init"
         self.is_file = False
         self.id = id(self)
-        # this one will not be exported, 'cause it is
-        # blacklisted
+        # this one will not be exported, 'cause it is blacklisted
         self.boo = True
 
-    def __repr__(self):
-        """
-        This __repr__() will fail at the time of object's
-        export (see above), so it will cause the object's
-        tree root to be renamed. To look at this you should
-        export env variable PYVFS_LOG=True and cat .../log
-        """
-        return "%s [0x%x]" % (self.__class__.__name__, self.id)
 
 # spawn several objects
 objects_A = [Example(x) for x in range(2)]
