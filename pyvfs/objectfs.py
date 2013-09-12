@@ -706,8 +706,30 @@ if os.environ.get("OBJECTFS_AUTOSTART", "True").lower() in (
 
 
 class MetaExport(type):
+    '''
+    The metaclass exports objects to the virtual filesystem.
+    To engage it, add to your class definition two attributes:
+
+     * `__metaclass__ = MetaExport`
+     * `__inode__ = {...}`
+
+    `__inode__` dictionary can contain inode configuration:
+
+     * `name`: string, default None
+     * `is_file`: bool, default False
+     * `blacklist`: list of strings
+     * `on_commit`: callback, default None
+     * `on_open`: callback, default None
+     * `basedir`: string, default ''
+     * `export_functions`: bool, default False
+     * `use_weakrefs`: bool, default True
+     * `cycle_detect`: one of 'none', 'symlink' or 'drop'
+    '''
     def __call__(cls, *argv, **kwarg):
         '''
+        Metaclass' `__call__()` is executed on each object
+        instantiation, that allows to intercept `__init__()`
+        calls for base classes as well as for children.
         '''
         global fs
         # do normal init
@@ -716,7 +738,6 @@ class MetaExport(type):
         # create local config copy
         config = deepcopy(getattr(obj, '__inode__', {}))
         config['root'] = True
-        print "Meta call", id(obj), config
 
         # load per-object attributes
         # e.g.: config['name'] == '@file_name' will
