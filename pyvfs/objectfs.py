@@ -227,10 +227,9 @@ class vInode(Inode):
         self.blacklist = None
         self.blacklist = kwarg.get("blacklist", None) or \
             self.parent.blacklist
-        if isinstance(self.blacklist, List):
-            if self.absolute_path(stop=self.get_root()) in self.blacklist:
-                self.destroy()
-                raise Eperm()
+        if isinstance(self.blacklist, List) and self.name in self.blacklist:
+            self.destroy()
+            raise Eperm()
         # force self.observe, bypass property setter
         self.__observe = None
         cycle_detect = kwarg.get("cycle_detect", "symlink")
