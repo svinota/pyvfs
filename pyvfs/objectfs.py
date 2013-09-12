@@ -735,126 +735,20 @@ class MetaExport(type):
         fs.export_item(obj, config)
         return obj
 
-class export(object):
-    '''
-    Class decorator
-    '''
-    def __init__(self, config=None):
-        '''
-        The code::
 
-            @export(...)
-            class A:
-
-        Results in this::
-
-            A = export(...)(A)
-
-        The first call is `__init__()`, the second is
-        `__call__()`. So, in the init we set up all
-        the environment
-        '''
-        global fs
-        self.fs = fs
-        self.config = {'root': True,
-                       'name': None}
-        self.config.update(config or {})
-
-    def __call__(self, wrap):
-        '''
-        This function is used to actually decorate the
-        class or a function.
-        '''
-        # the decorated object is a function
-        if isinstance(wrap, types.FunctionType):
-            self.config['export_functions'] = True
-            self.config['use_weakrefs'] = False
-            self.create(wrap, self.config)
-            return wrap
-
-        # the decorated object is a type
-        # so, substitue config['on_init']
-
-        # reassemble class dict:
-        new_dict = dict(wrap.__dict__)
-        new_dict['__dict__'] = new_dict
-        # return hacked type
-        return MetaExport(wrap.__name__, wrap.__bases__, new_dict)
-
-
-
-def __export(obj=None, **kwarg):
+def export(config):
     """
-    The decorator, that is used to export objects to the filesystem.
-    It can be used in two ways. The first, simplest, way allows you just
-    to catch the object creation and export the whole object tree
-    as is::
+    The decorator, that is used to export functions to the filesystem.
 
-        @export
-        class Example(object):
-
-            ...
-
-    Or you can provide named parameters::
-
-        @export(blacklist=["/bala","/dala"])
-        class Example(object):
-            # these two parameters will not be exported:
-            bala = None
-            dala = None
-            # but this one will be:
-            vala = None
-
-            ...
-
-    In the case when __init__() is not called (e.g., in pickling or
-    SQLAlchemy), on can use `@export` on some particular method. In
-    this case make sure that `@export` is the last in the decorator
-    chain::
-
-        class Record(Base):
-            field1 = Column(String)
-            field2 = Column(String)
-
-            @reconstructor
-            @export(set_hook=True)
-            def hook(self):
-                pass
-
-    Right now supported parameters are:
-        * **set_hook** -- use the function as a reconstruction hook
-        * **basedir** -- The base directory, where to put objects. If it
-          doesn't exist, it will be created.
-        * **blacklist** -- The list of paths from the **object tree root**,
-          that should not be exported. For example, if your object has an
-          attribute "bala" and you want to hide it, you should use
-          ``"/bala"`` in your blacklist. The same is for children, if you
-          want to hide the child "dala" of attribute "bala", you should
-          use ``"/bala/dala"``.
-        * **functions** -- Create files for functions and methods (default:
-          False). When True, the files will contain disassembled function
-          code.
-        * **weakref** -- Use weak references to this object (default: True)
-        * **cycle_detect** -- The cycle reference detection mode. Can be:
-            * ``none`` -- No cycle detection, the FS will not try
-              to watch references to the object from existing inodes.
-              So, if the object (or one of its children) will have a
-              reference to itself, it will be represented on the FS
-              as a new subdirectory, and so forth to the infinity.
-            * ``symlink`` -- Inodes, referencing the same objects, as
-              an existing inode does, will be created as symlinks.
-              This is the default behaviour.
-            * ``drop`` -- Such inodes will not be created at all. If
-              you want your FS for some reason be searchable by
-              recursive grep, you should use this option.
+    `config` has the same format as for MetaExport.
     """
-    if obj:
-        return Export(obj, **kwarg)
-    else:
-        def wrapper(obj):
-            return Export(obj, **kwarg)
-        return wrapper
+    global fs
+
+    def wrapper(obj):
+        fs.export_item(obj, config)
+        return obj
+    return wrapper
 
 
 # make the module safe for import
-__all__ = ["export", "srv"]
+__all__ = ["MetaExport", "export", "srv"]
