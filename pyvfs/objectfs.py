@@ -136,13 +136,19 @@ def _dir(obj):
         return [x for x in dir(obj) if not x.startswith("_")]
 
 
-def _get_name(obj):
+def _get_name(obj, template=None):
     """
     Get automatic name for an object.
     """
     if isinstance(obj, types.FunctionType):
         return obj.func_name
 
+    if isinstance(template, basestring) and template:
+        if template[0] == '@':
+            return getattr(obj, template[1:])
+        elif template[0] == '#':
+            attr = template[template.find('{') + 1:template.find('}')]
+            return template[1:].format(**{attr: str(getattr(obj, attr))})
     try:
         text = obj.__repr__()
         if text.find("/") == -1:
@@ -179,7 +185,7 @@ class vRepr(Inode):
     command line.
     """
 
-    def sync(self):
+    def sync(self, data):
         self.seek(0)
         self.truncate()
         try:
@@ -205,28 +211,26 @@ class vInode(Inode):
     auto_names = [".repr", ]
 
     def __init__(self, name, parent=None, mode=0, storage=None,
-                 obj=None, root=None, callback=None, **kwarg):
+                 obj=None, root=None, **kwarg):
 
         # respect preset mode
         if not (mode | self.mode):
             self.mode = stat.S_IFDIR
 
-        self.preserve_name = name is not None
-
         if mode:
             self.mode = mode
 
-        Inode.__init__(self, name, parent, mode, storage)
+        Inode.__init__(self, name, parent, mode, storage, **kwarg)
         if hasattr(self.parent, "stack"):
             self.stack = self.parent.stack
         else:
             self.stack = {}
         self.kwarg = kwarg
         self.root = root
-        self.callback = callback
         self.blacklist = None
         self.blacklist = kwarg.get("blacklist", None) or \
             self.parent.blacklist
+        self.name_template = kwarg.get('name_template', None)
         if isinstance(self.blacklist, List) and self.name in self.blacklist:
             self.destroy()
             raise Eperm()
@@ -318,7 +322,7 @@ class vInode(Inode):
         self.cleanup["stack"] = (self.stack.pop, (id(self.observe),))
 
     @restrict
-    def commit(self):
+    def commit(self, data):
         """
         Write data back from the I/O buffer to the corresponding
         attribute. Please note, that the data will be written
@@ -329,21 +333,20 @@ class vInode(Inode):
         if (self.mode & stat.S_IFREG) and \
                 self.name != ".repr":
             try:
-                if self.callback:
-                    getattr(self.observe, self.callback)(self.getvalue())
-                elif isinstance(self.observe, bool):
+                data = data or self.getvalue()
+                if isinstance(self.observe, bool):
                     _setattr(self.parent.observe, self.name,
-                             self.getvalue().lower() in
+                             data.lower() in
                              ("yes", "true", "on", "t", "1"))
                 else:
                     _setattr(self.parent.observe, self.name,
-                             type(self.observe)(self.getvalue()))
+                             type(self.observe)(data))
             except Exception as e:
                 logging.debug("[%s] commit() failed: %s" % (
                     self.path, str(e)))
 
     @restrict
-    def sync(self):
+    def sync(self, data):
         """
         Synchronize directory subtree with the object's state.
 
@@ -357,9 +360,11 @@ class vInode(Inode):
                 try:
                     if hasattr(k, "observe"):
                         _dir(k.observe)
-                        if k.observe is not None and not self.preserve_name:
-                            if _get_name(k.observe) != i:
-                                k.name = _get_name(k.observe)
+                        if k.observe is not None:
+                            if _get_name(k.observe,
+                                         k.name_template) != i:
+                                k.name = _get_name(k.observe,
+                                                   k.name_template)
                 except:
                     logging.debug("destroying %s" % (k.name))
                     logging.debug("%s" % (k.cleanup))
@@ -406,7 +411,7 @@ class vFunction(vInode):
             self.destroy()
             raise e
 
-    def sync(self):
+    def sync(self, data):
         pass
 
     def get_args(self, skip=None):
@@ -488,14 +493,14 @@ class vFunctionCall(vInode):
     def observe(self):
         return self.parent.observe
 
-    def sync(self):
+    def sync(self, data):
         if not self.called:
             self.seek(0)
             self.truncate()
             self.write("[call]\n%s" % ("\n".join(
                 self.parent.get_args(skip=("self",)))))
 
-    def commit(self):
+    def commit(self, data):
         if self.length == 0:
             return
         self.called = True
@@ -566,7 +571,7 @@ class vFunctionCode(vInode):
     def observe(self):
         return self.parent.observe
 
-    def sync(self):
+    def sync(self, data):
         self.seek(0)
         self.truncate()
         # write function code
@@ -599,14 +604,17 @@ class vLiteral(vInode):
     """
     mode = stat.S_IFREG
 
-    def sync(self):
+    def sync(self, data):
+
+        data = data or self.observe
+
         self.seek(0)
         self.truncate()
         try:
-            if isinstance(self.observe, unicode):
-                self.write(bytes(self.observe.encode('utf-8')))
+            if isinstance(data, unicode):
+                self.write(bytes(data.encode('utf-8')))
             else:
-                self.write(bytes(self.observe))
+                self.write(bytes(data))
         except:
             self.write(traceback.format_exc())
 
@@ -628,7 +636,7 @@ class ObjectFS(Storage):
                 except:
                     parent = vInode(name,
                                     parent,
-                                    mode=stat.S_IFDIR,
+                                    mode=stat.S_IFDIR | 0o755,
                                     cycle_detect="none")
         return parent
 
@@ -660,8 +668,14 @@ class ObjectFS(Storage):
             if not parent:
                 parent = self.root
 
+            name_template = None
             if not name:
                 name = _get_name(obj)
+            elif isinstance(name, basestring) \
+                    and name \
+                    and name[0] in ('@', '#'):
+                config['name_template'] = name
+                name = str(uuid.uuid4())
 
             if isinstance(obj, Skip) or \
                     (isinstance(obj, Func) and not
@@ -683,7 +697,7 @@ class ObjectFS(Storage):
                         klass = vLiteral
                     else:
                         klass = vInode
-                        mode = stat.S_IFDIR
+                        mode = stat.S_IFDIR | 0o755
                 new = parent.create(name,
                                     klass=klass,
                                     obj=obj,
@@ -719,7 +733,7 @@ class MetaExport(type):
      * `is_file`: bool, default False
      * `blacklist`: list of strings
      * `on_commit`: callback, default None
-     * `on_open`: callback, default None
+     * `on_sync`: callback, default None
      * `basedir`: string, default ''
      * `export_functions`: bool, default False
      * `use_weakrefs`: bool, default True
@@ -738,16 +752,6 @@ class MetaExport(type):
         # create local config copy
         config = deepcopy(getattr(obj, '__inode__', {}))
         config['root'] = True
-
-        # load per-object attributes
-        # e.g.: config['name'] == '@file_name' will
-        # load config['name'] from obj.file_name
-        for (key, item) in config.items():
-            if isinstance(item, basestring) and\
-                    item and \
-                    item[0] == '@' and\
-                    hasattr(obj, item[1:]):
-                config[key] = getattr(obj, item[1:])
 
         # create the FS object
         # pls note, that `self` here belongs to
