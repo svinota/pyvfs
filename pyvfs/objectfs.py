@@ -549,7 +549,7 @@ class vFunctionContext(vInode):
     def observe(self):
         return self.parent.observe
 
-    def open(self):
+    def open(self, data):
         new = vFunctionCall("call-%s" % (uuid.uuid4()), self.parent,
                             cycle_detect="none")
         self.parent.auto_names.append(new.name)

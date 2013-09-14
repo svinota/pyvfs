@@ -94,6 +94,7 @@ class Inode(BytesIO, object):
         self.gid = grp.getgrgid(self.gidnum).gr_name
         self.writelock = False
         # callbacks
+        self.on_open = kwarg.get('on_open', None)
         self.on_sync = kwarg.get('on_sync', None)
         self.on_commit = kwarg.get('on_commit', None)
         self.on_destroy = kwarg.get('on_destroy', None)
@@ -182,7 +183,7 @@ class Inode(BytesIO, object):
         pass
 
     @restrict
-    def open(self):
+    def open(self, data):
         pass
 
     @restrict
@@ -307,8 +308,20 @@ class Storage(object):
 
     def open(self, inode):
         with self.lock:
+            # 8<-----------------------------------------
+            # on_open hook
+            hook_data = None
+            if inode.on_open is not None:
+                try:
+                    hook_data = inode.on_open(inode)
+                except Exception:
+                    logging.error('on_open hook failed: %s\n%s' %
+                                  (inode, traceback.format_exc()))
+                if hook_data is None:
+                    return
+            # 8<-----------------------------------------
             self.sync(inode)
-            inode.open()
+            inode.open(hook_data)
 
     def sync(self, inode):
         with self.lock:
