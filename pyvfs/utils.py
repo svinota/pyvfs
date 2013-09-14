@@ -42,13 +42,13 @@ class logInode(Inode):
         Inode.__init__(self, name, parent)
         self.deque = deque(maxlen=maxlen)
 
-    def sync(self):
+    def sync(self, data):
         self.seek(0)
         self.truncate()
         for i in self.deque:
             Inode.write(self, i)
 
-    def commit(self):
+    def commit(self, data):
         self.deque.clear()
 
     def write(self, value):
@@ -63,7 +63,7 @@ class indexInode(Inode):
     An inode that lists full storage file index.
     Can be used for debugging purposes.
     """
-    def sync(self):
+    def sync(self, data):
         self.seek(0)
         self.truncate()
         self.write("# storage file index debug\n")

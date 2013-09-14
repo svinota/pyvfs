@@ -93,6 +93,10 @@ class Inode(BytesIO, object):
         self.uid = self.muid = pwd.getpwuid(self.uidnum).pw_name
         self.gid = grp.getgrgid(self.gidnum).gr_name
         self.writelock = False
+        # callbacks
+        self.on_sync = kwarg.get('on_sync', None)
+        self.on_commit = kwarg.get('on_commit', None)
+        self.on_destroy = kwarg.get('on_destroy', None)
         if not self.mode:
             if mode & stat.S_IFDIR:
                 self.mode = stat.S_IFDIR | DEFAULT_DIR_MODE
@@ -170,11 +174,11 @@ class Inode(BytesIO, object):
             return ""
 
     @restrict
-    def commit(self):
+    def commit(self, data):
         pass
 
     @restrict
-    def sync(self):
+    def sync(self, data):
         pass
 
     @restrict
@@ -299,22 +303,47 @@ class Storage(object):
         with self.lock:
             inode.seek(size)
             inode.truncate()
-            inode.commit()
+            inode.commit(None)
 
     def open(self, inode):
         with self.lock:
-            inode.sync()
+            self.sync(inode)
             inode.open()
 
     def sync(self, inode):
         with self.lock:
-            inode.sync()
+            if not inode.writelock:
+                # 8<-------------------------------------
+                # on_sync hook
+                hook_data = None
+                if inode.on_sync is not None:
+                    try:
+                        hook_data = inode.on_sync(inode)
+                    except Exception:
+                        logging.error('on_sync hook failed: %s\n%s' %
+                                      (inode, traceback.format_exc()))
+                    if hook_data is None:
+                        return
+                # 8<-------------------------------------
+                inode.sync(hook_data)
 
     def commit(self, inode):
         with self.lock:
             if inode.writelock:
                 inode.writelock = False
-                inode.commit()
+                # 8<-------------------------------------
+                # on_commit hook
+                hook_data = None
+                if inode.on_commit is not None:
+                    try:
+                        hook_data = inode.on_commit(inode)
+                    except Exception:
+                        logging.error('on_commit hook failed: %s\n%s' %
+                                      (inode, traceback.format_exc()))
+                    if hook_data is None:
+                        return
+                # 8<-------------------------------------
+                inode.commit(hook_data)
 
     def write(self, inode, data, offset=0):
         with self.lock:
@@ -326,13 +355,25 @@ class Storage(object):
     def read(self, inode, size, offset=0):
         with self.lock:
             if offset == 0:
-                inode.sync()
+                self.sync(inode)
             inode.seek(offset, os.SEEK_SET)
             data = inode.read(size)
         return data
 
     def destroy(self, inode):
         with self.lock:
+            # 8<-----------------------------------------
+            # on_destroy hook
+            hook_data = None
+            if inode.on_destroy is not None:
+                try:
+                    hook_data = inode.on_destroy(inode)
+                except Exception:
+                    logging.error('on_destroy hook failed: %s\n%s' %
+                                  (inode, traceback.format_exc()))
+                if hook_data is None:
+                    return
+            # 8<-----------------------------------------
             for i, k in list(inode.children.items()):
                 if i not in inode.special_names:
                     self.remove(k)
