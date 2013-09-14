@@ -753,6 +753,11 @@ class MetaExport(type):
         config = deepcopy(getattr(obj, '__inode__', {}))
         config['root'] = True
 
+        # apply filter
+        if config.get('filter', None):
+            if not config['filter'](obj):
+                return obj
+
         # create the FS object
         # pls note, that `self` here belongs to
         # the decorator namespace
