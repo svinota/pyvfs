@@ -142,6 +142,7 @@ class ffs(fuse.Fuse, object):
     @checkout
     def rename(self, inode, path):
         fname, parent = getParts(path)
+        parent = self.storage.checkout(hash8(parent))
         try:
             self.storage.reparent(parent, inode, fname)
         except:
