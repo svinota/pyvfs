@@ -209,18 +209,43 @@ class vInode(Inode):
     """
 
     auto_names = [".repr", ]
+    mode = stat.S_IFDIR
+
+    @classmethod
+    def get_mode(cls, obj, orig_mode, **config):
+        mode = cls.mode
+
+        # force mode on is_file flag
+        if config.get('is_file', False):
+            mode = stat.S_IFREG
+
+        # get mode
+        if callable(orig_mode):
+            mode |= orig_mode(obj)
+        elif config.get('mode', None):
+            mode |= orig_mode
+
+        # avoid 0o000 dirs
+        if mode & stat.S_IFDIR and not mode & 0o500:
+            # FIXME default dir mode
+            mode |= 0o755
+
+        return mode
 
     def __init__(self, name, parent=None, mode=0, storage=None,
                  obj=None, root=None, **kwarg):
 
-        # respect preset mode
-        if not (mode | self.mode):
-            self.mode = stat.S_IFDIR
-
-        if mode:
-            self.mode = mode
-
-        Inode.__init__(self, name, parent, mode, storage, **kwarg)
+        # original mode -- may be a function that returns the mode
+        self.orig_mode = mode
+        # result real mode
+        self.mode = self.__class__.get_mode(obj, self.orig_mode, **kwarg)
+        # pass only resulting mode to the VFS layer, it has nothing to do
+        # with callables
+        Inode.__init__(self, name,
+                       parent=parent,
+                       mode=self.mode,
+                       storage=storage,
+                       **kwarg)
         if hasattr(self.parent, "stack"):
             self.stack = self.parent.stack
         else:
@@ -384,6 +409,7 @@ class vInode(Inode):
             for i in to_create:
                 self.storage.create(name=i, parent=self,
                                     obj=_getattr(self.observe, i),
+                                    mode=self.orig_mode,
                                     **self.kwarg)
 
 
@@ -395,6 +421,7 @@ class vFunction(vInode):
     * ``context`` -- creates new ``call`` files
     * ``code`` -- function source
     """
+    mode = stat.S_IFDIR
 
     def __init__(self, *argv, **kwarg):
         kwarg['cycle_detect'] = 'none'
@@ -636,7 +663,6 @@ class ObjectFS(Storage):
                 except:
                     parent = vInode(name,
                                     parent,
-                                    mode=stat.S_IFDIR | 0o755,
                                     cycle_detect="none")
         return parent
 
@@ -686,18 +712,17 @@ class ObjectFS(Storage):
                 return
 
             try:
-                klass = Inode
-                mode |= stat.S_IFREG
-                if config:
-                    if isinstance(obj, Func) and \
-                            config.get("export_functions", False):
-                        klass = vFunction
-                        mode = stat.S_IFDIR
-                    elif isinstance(obj, File) or config.get('is_file', False):
-                        klass = vLiteral
-                    else:
-                        klass = vInode
-                        mode = stat.S_IFDIR | 0o755
+                klass = None
+                req_mode = vInode.get_mode(obj, mode, **config)
+
+                if isinstance(obj, Func) and \
+                        config.get("export_functions", False):
+                    klass = vFunction
+                elif req_mode & stat.S_IFREG or isinstance(obj, File):
+                    klass = vLiteral
+                else:
+                    klass = vInode
+
                 new = parent.create(name,
                                     klass=klass,
                                     obj=obj,
