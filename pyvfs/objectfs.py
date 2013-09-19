@@ -643,10 +643,10 @@ class ObjectFS(Storage):
     def export_item(self, obj, config):
         self.create(parent=self.mkdir(config.get('basedir', '')),
                     obj=obj,
-                    mode=config.pop('mode', 0o700),
+                    mode=config.pop('mode', 0),
                     **config)
 
-    def create(self, name=None, parent=None, obj=None, mode=0, **config):
+    def create(self, name=None, parent=None, mode=0, obj=None, **config):
         """
         Create an object inode and all the subtree. If ``parent``
         is not defined, attach new inode to the storage root.
