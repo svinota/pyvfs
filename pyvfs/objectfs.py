@@ -262,6 +262,7 @@ class vInode(Inode):
         # force self.observe, bypass property setter
         self.__observe = None
         cycle_detect = kwarg.get("cycle_detect", "symlink")
+        self.static_names = {}
         # create the hook to the object only on the object root vInode
         try:
             if self.root:
@@ -371,6 +372,19 @@ class vInode(Inode):
                     self.path, str(e)))
 
     @restrict
+    def create(self, name, mode=0, klass=None, **kwarg):
+        if not kwarg.get('is_internal', False):
+            klass = Inode
+            self.static_names[name] = (mode, klass, kwarg)
+        return Inode.create(self, name, mode, klass, **kwarg)
+
+    @restrict
+    def remove(self, inode):
+        if inode.name in self.static_names:
+            del self.static_names[inode.name]
+        return Inode.remove(self, inode)
+
+    @restrict
     def sync(self, data):
         """
         Synchronize directory subtree with the object's state.
@@ -402,7 +416,8 @@ class vInode(Inode):
                 obs = set()
             to_delete = chs - obs -\
                 set(self.special_names) -\
-                set(self.auto_names)
+                set(self.auto_names) -\
+                set(self.static_names)
             to_create = obs - chs
             for i in to_delete:
                 self.children[i].destroy()
@@ -777,6 +792,7 @@ class MetaExport(type):
         # create local config copy
         config = deepcopy(getattr(obj, '__inode__', {}))
         config['root'] = True
+        config['is_internal'] = True
 
         # apply filter
         if config.get('filter', None):
