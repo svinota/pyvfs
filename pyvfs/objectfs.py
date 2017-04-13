@@ -30,7 +30,6 @@ automatically (yet).
 
 import types
 import stat
-import os
 import sys
 import ast
 import dis
@@ -40,11 +39,13 @@ import traceback
 import inspect
 import uuid
 from abc import ABCMeta
-from copy import deepcopy
+from copy import copy
 from pyvfs.vfs import Storage, Inode, Eexist, Eperm, restrict
-from pyvfs.utils import Server
 if sys.version_info[0] > 2:
     from configparser import ConfigParser
+    unicode = str
+    long = int
+    basestring = (str, bytes)
 else:
     from ConfigParser import SafeConfigParser as ConfigParser
 
@@ -79,8 +80,7 @@ List.register(frozenset)
 String = ABCMeta("String", (object,), {})
 String.register(str)
 String.register(bytes)
-if sys.version_info[0] == 2:
-    String.register(unicode)
+String.register(unicode)
 
 
 File = ABCMeta("File", (object,), {})
@@ -90,10 +90,10 @@ File.register(int)
 File.register(bytes)
 File.register(str)
 File.register(type(None))
+File.register(unicode)
+File.register(long)
 if sys.version_info[0] == 2:
     File.register(types.FileType)
-    File.register(unicode)
-    File.register(long)
 
 
 def _setattr(obj, item, value):
@@ -666,6 +666,9 @@ class ObjectFS(Storage):
     ObjectFS storage class. Though there is no limit of
     ObjectFS instances, the module starts only one storage.
     """
+    def __init__(self):
+        super(ObjectFS, self).__init__(vInode, root=True)
+
     def mkdir(self, basedir):
         if isinstance(basedir, basestring):
             basedir = basedir.split('/')
@@ -709,7 +712,6 @@ class ObjectFS(Storage):
             if not parent:
                 parent = self.root
 
-            name_template = None
             if not name:
                 name = _get_name(obj)
             elif isinstance(name, basestring) \
@@ -748,78 +750,49 @@ class ObjectFS(Storage):
 
         return new
 
-# 8<-----------------------------------------------------------------------
-#
-# create FS
-fs = ObjectFS(vInode, root=True)
-srv = Server(fs)
-# do not start FS automatically if OBJECTFS_AUTOSTART is set to False
-if os.environ.get("OBJECTFS_AUTOSTART", "True").lower() in (
-        "yes", "true", "on", "t", "1"):
-    srv.start()
 
-
-class MetaExport(type):
-    '''
-    The metaclass exports objects to the virtual filesystem.
-    To engage it, add to your class definition two attributes:
-
-     * `__metaclass__ = MetaExport`
-     * `__inode__ = {...}`
-
-    `__inode__` dictionary can contain inode configuration:
-
-     * `name`: string, default None
-     * `is_file`: bool, default False
-     * `blacklist`: list of strings
-     * `on_commit`: callback, default None
-     * `on_sync`: callback, default None
-     * `basedir`: string, default ''
-     * `export_functions`: bool, default False
-     * `use_weakrefs`: bool, default True
-     * `cycle_detect`: one of 'none', 'symlink' or 'drop'
-    '''
-    def __call__(cls, *argv, **kwarg):
-        '''
-        Metaclass' `__call__()` is executed on each object
-        instantiation, that allows to intercept `__init__()`
-        calls for base classes as well as for children.
-        '''
-        global fs
-        # do normal init
-        obj = type.__call__(cls, *argv, **kwarg)
-
-        # create local config copy
-        config = deepcopy(getattr(obj, '__inode__', {}))
-        config['root'] = True
-        config['is_internal'] = True
-
-        # apply filter
-        if config.get('filter', None):
-            if not config['filter'](obj):
-                return obj
-
-        # create the FS object
-        # pls note, that `self` here belongs to
-        # the decorator namespace
-        logging.debug('create object %s with config %s' % (obj, config))
-        fs.export_item(obj, config)
-        return obj
-
-
-def export(config):
+def export(*argv, **config):
     """
     The decorator, that is used to export functions to the filesystem.
 
     `config` has the same format as for MetaExport.
     """
-    global fs
+    config = copy(config)
 
-    def wrapper(obj):
-        fs.export_item(obj, config)
-        return obj
-    return wrapper
+    def wrap(c):
+
+        fs = config['fs']
+
+        if isinstance(c, types.FunctionType):
+            fs.export_item(c, config)
+
+        elif isinstance(c, Cls):
+            if hasattr(c, "__init__"):
+                old_init = c.__init__
+            else:
+                def fake_init(*argv, **kwarg):
+                    pass
+                old_init = fake_init
+
+            def new_init(self, *argv, **kwarg):
+                old_init(self, *argv, **kwarg)
+                if 'filter' in config and not config['filter'](self):
+                    return
+
+                config['root'] = True
+                config['is_internal'] = True
+                logging.debug('create object %s with config %s' % (self, config))
+                fs.export_item(self, config)
+
+            c.__init__ = new_init
+
+        return c
+
+    if len(argv):
+        return wrap(argv[0])
+    else:
+        return wrap
 
 
 # make the module safe for import
-__all__ = ["MetaExport", "export", "srv"]
+__all__ = ["export", "ObjectFS"]
